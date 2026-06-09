@@ -5,6 +5,30 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.0.3] — 2026-06-09 [`9764e5f`...`beb85df`](https://github.com/Medica-Sur-TI/cidyt-web-app/compare/9764e5f...beb85df)
+
+### Login 2-step flow, Code-Splitting y Sidebar Legacy
+
+#### Agregado
+- Login de 2 pasos con paridad visual legacy: Paso 1 (Credenciales) + Paso 2 (Selección de Horario MATUTINO/VESPERTINO)
+- Logo corporativo Médica Sur (`LogoMS1.svg`) y favicons integrados desde el proyecto Legacy a `/public`
+- Code-splitting con TanStack Router lazy routes (`reportes`, `caja`, `lista-dia`, `cubiculo`, `admin.perfiles`)
+- `manualChunks` en Vite para separar Firebase y TanStack en vendors independientes
+- Sidebar refactorizado con paridad 100% legacy: Header con logo + versión, UserBlock con avatar verde + TurnoPill dinámica, navegación con borde izquierdo verde en activo
+- Botón hamburger toggle (✕/☰) con posición legacy
+
+#### Corregido
+- Tecla Enter no activaba "Iniciar sesión" — eliminado `@tanstack/react-form` del login, reemplazado por formulario nativo con `useRef`
+- Botón "Cerrar sesión" no funcionaba — agregada navegación a `/login` tras `signOut` y limpieza de `sessionStorage`
+- Botón "Regresar" en Paso 2 entraba al sistema en vez de volver — ahora ejecuta `logout()` antes de cambiar step (evita redirect por guard de auth)
+
+#### Modificado
+- Bundle reducido de 912KB (chunk único) a chunks distribuidos: Firebase ~462KB, TanStack ~190KB, App ~240KB + lazy routes ~22KB
+- Sidebar: ancho fijo 200px, targets táctiles 44px (Apple HIG), `touch-action: manipulation`
+- `AppShell.tsx`: refactorizado con layout fixed, turno desde `sessionStorage`, responsive hamburger
+
+---
+
 ## [3.0.2] — 2026-06-09 [`d260a19`...`aef915c`](https://github.com/Medica-Sur-TI/cidyt-web-app/compare/d260a19...aef915c)
 
 ### Migración completa a Vite + TanStack (SPA client-side)
