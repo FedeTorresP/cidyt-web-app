@@ -1,19 +1,29 @@
 import { useState } from 'react'
 import { Outlet, useNavigate } from '@tanstack/react-router'
-import { Menu, LogOut } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useMenu } from '@/hooks/use-menu'
 import { logout } from '@/services/auth'
 import { SidebarNav } from './SidebarNav'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { AlertBanner } from '@/components/shared/AlertBanner'
-import { cn } from '@/lib/utils'
 
 export function AppShell() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, firebaseUser } = useAuth()
   const { data: menuItems, isLoading: menuLoading, error: menuError } = useMenu()
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  // Derivar nombre de usuario (mayúsculas como legacy)
+  const userName = (
+    firebaseUser?.displayName ||
+    user?.email?.split('@')[0] ||
+    'Usuario'
+  ).toUpperCase()
+
+  // Turno almacenado en sessionStorage desde el login
+  const turno = typeof window !== 'undefined'
+    ? sessionStorage.getItem('cidyt_turno')
+    : null
 
   const handleLogout = async () => {
     try {
@@ -25,34 +35,36 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex flex-row min-h-screen min-h-[100dvh]">
-      {/* Overlay (mobile/portrait) */}
+    <div className="flex flex-row" style={{ minHeight: '100dvh' }}>
+      {/* Overlay (portrait / mobile) */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-[rgba(10,31,92,0.4)] z-[199] lg:hidden"
+          className="fixed inset-0 z-[199] lg:hidden"
+          style={{ backgroundColor: 'rgba(10,31,92,0.4)' }}
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={cn(
-          'w-[200px] min-w-[200px] bg-[var(--color-primario)] flex flex-col fixed top-0 left-0 h-screen h-[100dvh] z-[200] overflow-y-auto overflow-x-hidden transition-transform duration-250 ease-in-out',
+        className={[
+          'fixed top-0 left-0 z-[200] flex flex-col overflow-hidden',
+          'transition-transform duration-[250ms] ease-in-out',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-        )}
-        aria-label="Menú de navegación"
+        ].join(' ')}
+        style={{
+          width: 200,
+          minWidth: 200,
+          height: '100dvh',
+          backgroundColor: 'var(--color-primario)',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        }}
+        aria-label="Panel de navegación"
       >
-        {/* Header */}
-        <div className="px-4 pt-4 pb-3 border-b border-white/10 flex flex-col gap-1">
-          <span className="font-bold text-base tracking-wide text-white">IPadCIDyT</span>
-          {user?.email && (
-            <span className="text-[0.7rem] text-white/60 truncate">{user.email}</span>
-          )}
-        </div>
-
-        {/* Menu */}
+        {/* Nav content */}
         {menuLoading ? (
-          <div className="flex items-center justify-center py-6">
+          <div className="flex items-center justify-center py-6 flex-1">
             <LoadingSpinner size="sm" className="border-white/30 border-t-white" />
           </div>
         ) : menuError ? (
@@ -60,38 +72,104 @@ export function AppShell() {
             <AlertBanner variant="error">No se pudo cargar el menú.</AlertBanner>
           </div>
         ) : (
-          <SidebarNav items={menuItems ?? []} />
+          <SidebarNav
+            items={menuItems ?? []}
+            userName={userName}
+            turno={turno}
+          />
         )}
 
-        {/* Footer: Logout */}
-        <div className="mt-auto px-3 py-3 border-t border-white/10">
+        {/* Footer: Botón Salir */}
+        <div
+          className="shrink-0"
+          style={{
+            padding: '8px 12px 10px',
+            borderTop: '1px solid rgba(255,255,255,0.1)',
+          }}
+        >
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-[12px] text-white/70 hover:bg-white/8 hover:text-white transition-all bg-transparent"
+            className="flex items-center justify-center gap-2 w-full"
+            style={{
+              minHeight: 44,
+              padding: '0 12px',
+              backgroundColor: 'rgba(255,255,255,0.07)',
+              color: 'rgba(255,255,255,0.65)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 'var(--radius-default)',
+              fontSize: '0.8125rem',
+              fontWeight: 500,
+              touchAction: 'manipulation',
+              transition: 'background-color 0.2s ease',
+            }}
+            aria-label="Cerrar sesión"
           >
-            <LogOut size={14} />
-            Cerrar sesión
+            {/* Ícono de salida (logout arrow) */}
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            <span>Salir</span>
           </button>
         </div>
       </aside>
 
       {/* Main content */}
       <main
-        className={cn(
-          'flex-1 min-h-screen min-h-[100dvh] bg-[var(--color-fondo)] p-3 lg:p-4 transition-[margin-left] duration-250 ease-in-out',
-          sidebarOpen ? 'lg:ml-[200px]' : 'ml-0',
-        )}
+        className="flex-1 bg-[var(--color-fondo)] p-3 lg:p-4 transition-[margin-left] duration-[250ms] ease-in-out"
+        style={{
+          minHeight: '100dvh',
+          marginLeft: sidebarOpen ? 200 : 0,
+        }}
       >
-        {/* Hamburger */}
+        {/* Hamburger toggle */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="fixed top-3 left-3 z-[201] w-9 h-9 rounded-lg bg-[var(--color-primario)] text-white flex items-center justify-center shadow-md lg:relative lg:top-0 lg:left-0 lg:mb-3"
+          className="fixed top-2 z-[201] flex items-center justify-center"
+          style={{
+            left: sidebarOpen ? 164 : 8,
+            width: 36,
+            height: 36,
+            backgroundColor: 'var(--color-primario)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 'var(--radius-default)',
+            touchAction: 'manipulation',
+            transition: 'left 0.25s ease',
+          }}
           aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={sidebarOpen}
         >
-          <Menu size={18} />
+          {sidebarOpen ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          )}
         </button>
 
-        <Outlet />
+        <div style={{ paddingTop: 44 }}>
+          <Outlet />
+        </div>
       </main>
     </div>
   )
