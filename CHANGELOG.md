@@ -1,0 +1,136 @@
+# Historial de Cambios — cidyt-web-app (IPadCIDyT)
+
+Todos los cambios notables en este proyecto se documentan en este archivo.
+El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versionado **[Semántico](https://semver.org/)**.
+
+---
+
+## [3.0.2] — 2026-06-09 [`d260a19`...`aef915c`](https://github.com/Medica-Sur-TI/cidyt-web-app/compare/d260a19...aef915c)
+
+### Migración completa a Vite + TanStack (SPA client-side)
+
+#### Agregado
+- Vite 6 como build tool y dev server (reemplaza Next.js 14)
+- TanStack Router con file-based routing y route guards
+- TanStack Query para data fetching y cache (reemplaza Server Components)
+- TanStack Table para tablas de datos (reemplaza HTML tables con estilos inline)
+- TanStack Form para formularios (reemplaza Server Actions + `useActionState`)
+- shadcn/ui como sistema de componentes unificado (Radix + Tailwind CSS v4)
+- Design tokens de Médica Sur traducidos a Tailwind CSS v4
+- Firebase Client SDK como única capa de auth y datos (sin Admin SDK)
+- AuthContext con `onAuthStateChanged` para estado de sesión reactivo
+- Route guard `_authenticated.tsx` con `beforeLoad`
+- Menú lateral dinámico desde Firestore con filtrado RBAC client-side
+- Pipeline CI/CD con GitHub Actions + Docker + Firebase Hosting [`994013c`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/994013c)
+- Secretos centralizados en GCP Secret Manager
+- Infraestructura como código con Terraform
+- Interfaz optimizada para iPadOS (targets táctiles 44×44px, touch-action manipulation)
+
+#### Eliminado
+- Next.js 14 (App Router, Server Components, Server Actions, Middleware)
+- Firebase Admin SDK (ya no se usa `verifyIdToken` ni acceso server-side)
+- Cookie HTTP-only `__session` (reemplazada por `onAuthStateChanged`)
+- Node.js runtime requerido en producción (ahora es SPA estática)
+- CSS Modules y estilos inline del legacy
+- SSR y Cloud Functions para hosting
+
+#### Modificado
+- Arquitectura: de SSR (Next.js) a SPA estática (Vite)
+- Auth: de Admin SDK + cookies a Client SDK + `onAuthStateChanged`
+- Data layer: de Server Components a TanStack Query hooks
+- UI: de estilos inline/CSS Modules a shadcn/ui + Tailwind
+- Deploy: de Firebase Hosting + SSR a Firebase Hosting (SPA estática)
+- RBAC: de verificación server-side a Custom Claims extraídos en cliente
+
+---
+
+## [3.0.1] — 2026-06-09 [`aef915c`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/aef915c)
+
+### Corregido
+- **Fix deploy (auth/invalid-api-key):** Corregido formato del secreto `FIREBASE_CONFIG_SECRET` en GCP Secret Manager. El secreto estaba almacenado como objeto JSON pero el workflow lo escribe directo a `.env.local`, que requiere formato `KEY=VALUE` para que Vite embeba las variables correctamente en el bundle.
+
+---
+
+## [3.0.0] — 2026-06-08
+
+### Migración a Firebase (sobre Next.js)
+
+#### Agregado
+- Firebase Auth con proveedor email/password (reemplaza NextAuth)
+- Cloud Firestore como base de datos (reemplaza PostgreSQL/Cloud SQL)
+- Firebase Hosting con soporte SSR para Next.js
+- Servicio RBAC basado en Custom Claims + colecciones Firestore
+- Auditoría transaccional atómica en Firestore
+- Menú lateral dinámico desde colección `menu_items`
+
+#### Eliminado
+- NextAuth (`next-auth`, route handler, SessionProvider)
+- PostgreSQL y Drizzle ORM
+- Infraestructura Docker/Cloud Build del legacy
+- Migraciones SQL y esquemas Drizzle
+
+#### Modificado
+- Middleware migrado de Edge Runtime a Node.js Runtime
+- Sesión basada en cookie HTTP-only con Token_ID de Firebase Auth
+- Queries migradas de Drizzle ORM a Firestore Admin SDK
+
+---
+
+## [2.5.4 — Legacy] — 2026-05-28
+
+### Agregado
+- Card "Información del Paciente" en pantalla de detalle: muestra datos demográficos y clínicos relevantes en caja consolidada
+- Auto-carga de factura existente: sistema detecta si hay factura previa para el paciente y la carga automáticamente en flujo de retiro
+
+### Modificado
+- Ciclo de vida del retiro de enfermería: optimizado flujo visual con confirmación explícita mediante botón "Confirmar Retiro" para mejorar UX y prevenir cambios accidentales
+
+### Corregido
+- Ajustes de estilos en card de paciente para alineación con grid de iPad
+
+---
+
+## [2.0.0-dev — Legacy] — 2026-06-03
+
+### UI/UX
+
+#### Agregado
+- **LoginForm refactorizado** `[467aa66]`: Componente completamente reescrito con Tailwind CSS y variables de diseño (tokens CSS). Flujo de 2 pasos (`login` + `horario`) con control de horarios laborales y spinners animados de carga
+- Scaffolding inicial de v2 con flat file layout, Next.js 14, TypeScript y Drizzle ORM
+
+#### Modificado
+- **Pantalla de Login:** Fondo de contenedor principal reemplazado de gris genérico por token de color primario institucional (`--color-primario`, azul `#0A1F5C`) para paridad visual en iPad y consistencia con el sistema de diseño
+- **Design tokens del Legacy:**
+  - Paleta institucional Médica Sur: primario `#0A1F5C`, acento `#00A651`
+  - Paddings, gaps y sombras extraídos de CSS Modules para traducción a Tailwind
+  - Tipografía base 13px SF Pro / system-ui
+  - Rejillas ultra-compactas para tablas optimizadas en iPad
+  - Targets táctiles mínimos de 44×44px
+
+#### Referencia de Estilos Legacy (para paridad visual)
+- `caja.module.css`: Tablas y rejillas ultra-compactas para pantallas iPad en modo landscape
+- Selectores complejos de layout para paneles de cubículos, caja y lista del día
+- Design tokens dispersos en múltiples `.module.css` y `globals.css`
+- Densidad de datos clínica: máximo aprovechamiento de viewport sin scroll innecesario
+
+---
+
+## Tipos de Cambios
+
+| Etiqueta | Significado |
+|----------|-------------|
+| **Agregado** | Nuevas funcionalidades o componentes |
+| **Modificado** | Cambios a comportamiento o apariencia existente |
+| **Corregido** | Corrección de bugs |
+| **Eliminado** | Funcionalidad deprecada o removida |
+| **Seguridad** | Parches de seguridad o ajustes de acceso |
+
+---
+
+## Versionado
+
+`MAJOR.MINOR.PATCH`
+
+- **MAJOR**: cambios incompatibles (migraciones de stack)
+- **MINOR**: nuevas funcionalidades retrocompatibles
+- **PATCH**: correcciones de bugs

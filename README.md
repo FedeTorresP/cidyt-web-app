@@ -1,30 +1,32 @@
-# 🏥 cidyt-web-app — Plataforma Core de Diagnóstico y Consulta Médica
+# 🏥 cidyt-web-app
 
-**IPadCIDyT v4 — Vite + TanStack + Firebase**
+**IPadCIDyT v3.0** — Plataforma Core de Diagnóstico y Consulta Médica
+
+Vite + TanStack + shadcn/ui + Firebase Client SDK
 
 ---
 
 ## Descripción
 
-cidyt-web-app es la modernización completa de la plataforma clínica IPadCIDyT, migrando de Next.js 14 (SSR) a una SPA client-side con Vite. Diseñada para uso exclusivo en iPad por personal médico del CIDyT (Centro Integral de Diagnóstico y Tratamiento) de Médica Sur.
+Sistema clínico integral del CIDyT (Centro Integral de Diagnóstico y Tratamiento) de Médica Sur. Diseñado para uso exclusivo en iPad por personal médico, con interfaz táctil optimizada para iPadOS.
 
-La interfaz mantiene paridad visual 100% con el ecosistema legacy, optimizada para pantallas táctiles iPadOS con densidad de datos clínica.
+Gestiona el flujo completo del paciente: admisión, asignación de cubículos, seguimiento de estudios, facturación en caja y reportes operativos.
 
 ---
 
 ## Stack Tecnológico
 
-| Capa | Tecnología |
-|------|-----------|
-| Build / Dev | Vite 6 |
-| Router | TanStack Router (file-based) |
-| Data Fetching | TanStack Query |
-| Tablas | TanStack Table |
-| Formularios | TanStack Form |
-| UI | shadcn/ui (Radix + Tailwind CSS v4) |
-| Auth + DB | Firebase Client SDK (Auth + Firestore) |
-| Tipos | TypeScript 5.8 |
-| Iconos | Lucide React |
+| Capa | Tecnología | Versión |
+|------|-----------|---------|
+| Build / Dev | Vite | 6.3 |
+| Router | TanStack Router (file-based) | 1.x |
+| Data Fetching | TanStack Query | 5.x |
+| Tablas | TanStack Table | 8.x |
+| Formularios | TanStack Form | 1.x |
+| UI | shadcn/ui (Radix + Tailwind CSS v4) | — |
+| Auth + DB | Firebase Client SDK (Auth + Firestore) | 11.10 |
+| Tipos | TypeScript | 5.8 |
+| Iconos | Lucide React | — |
 
 ---
 
@@ -49,7 +51,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Edita `.env.local` con las llaves del proyecto Firebase:
+Edita `.env.local` con las llaves del proyecto Firebase (solicitar a TI):
 
 ```env
 VITE_FIREBASE_API_KEY=
@@ -61,7 +63,7 @@ VITE_FIREBASE_APP_ID=
 VITE_APP_TIMEZONE=America/Mexico_City
 ```
 
-### Desarrollo
+### Desarrollo local
 
 ```bash
 npm run dev
@@ -75,10 +77,10 @@ Disponible en `http://localhost:5173`
 
 | Comando | Descripción |
 |---------|-------------|
-| `npm run dev` | Servidor de desarrollo (HMR) |
+| `npm run dev` | Servidor de desarrollo con HMR |
 | `npm run build` | Build de producción (typecheck + bundle) |
-| `npm run preview` | Preview del build de producción |
-| `npm run typecheck` | Verificación de tipos sin emitir |
+| `npm run preview` | Preview local del build |
+| `npm run typecheck` | Verificación de tipos |
 | `npm run lint` | ESLint |
 
 ---
@@ -93,7 +95,7 @@ src/
 ├── lib/
 │   ├── firebase.ts             Firebase Client SDK init
 │   ├── query-client.ts         TanStack Query client
-│   └── utils.ts                cn() helper (clsx + tailwind-merge)
+│   └── utils.ts                cn() helper
 ├── services/
 │   ├── auth.ts                 Login, logout, onAuthStateChanged
 │   ├── rbac.ts                 Permisos y filtrado de menú
@@ -101,11 +103,11 @@ src/
 │   └── time.ts                 UTC ↔ America/Mexico_City
 ├── hooks/
 │   ├── use-auth.tsx            AuthContext + useAuth
-│   ├── use-menu.ts             Menú dinámico (Firestore + fallback)
+│   ├── use-menu.ts             Menú dinámico (Firestore + RBAC)
 │   ├── use-cubiculos.ts        Queries de cubículos
 │   ├── use-facturas.ts         Queries/mutations de caja
 │   ├── use-medicos.ts          Médicos activos
-│   └── use-reportes.ts         Reportes (checkup, general, estadística)
+│   └── use-reportes.ts         Reportes
 ├── components/
 │   ├── ui/                     Primitivos shadcn (Button, Input, Card)
 │   ├── layout/                 AppShell, SidebarNav
@@ -114,7 +116,7 @@ src/
 │   ├── __root.tsx              Root layout
 │   ├── login.tsx               Login (pública)
 │   ├── _authenticated.tsx      Guard de auth + AppShell
-│   └── _authenticated/         Rutas protegidas (caja, lista-dia, etc.)
+│   └── _authenticated/         Rutas protegidas
 └── types/
     ├── models.ts               Interfaces Firestore
     ├── auth.ts                 AuthUser, AuthState
@@ -123,56 +125,46 @@ src/
 
 ---
 
-## Autenticación
+## Autenticación y RBAC
 
 - Firebase Auth con email/password
-- `onAuthStateChanged` para estado reactivo
-- Custom Claims para RBAC (`roleId`, `permissions`)
-- Si no hay claims configurados, el sistema asume acceso admin (modo desarrollo)
-- Route guard via `beforeLoad` en TanStack Router
+- Estado reactivo via `onAuthStateChanged`
+- Custom Claims para RBAC (`roleId`, permisos)
+- Route guard con `beforeLoad` en TanStack Router
+- Menú lateral dinámico filtrado por permisos del rol
 
 ---
 
-## Menú Lateral
+## Deploy
 
-El menú se carga desde la colección `menu_items` de Firestore, filtrado por permisos del rol. Si la colección está vacía o inaccesible, se usa un fallback estático con todas las rutas.
+El deploy es automático al hacer push a `main`:
 
----
+1. GitHub Actions ejecuta el workflow `.github/workflows/deploy.yml`
+2. Se obtienen las variables de entorno desde GCP Secret Manager
+3. Build con Docker (multi-stage)
+4. Deploy a Firebase Hosting (SPA estática)
 
-## Colecciones Firestore
-
-| Colección | Uso |
-|-----------|-----|
-| `pacientes` | Datos demográficos |
-| `seguimientos` | Check-ups activos |
-| `estudios_paciente` | Estudios asignados |
-| `facturas` | Movimientos de caja |
-| `cubiculos` | Cubículos físicos |
-| `sesiones_cubiculo` | Asignación médico-cubículo |
-| `medicos` | Catálogo de médicos |
-| `empresas` | Empresas clientes |
-| `menu_items` | Menú lateral dinámico |
-| `roles` / `rol_permisos` / `permisos` | RBAC |
-| `audit_log` | Auditoría |
+**URL de producción:** https://ipad-cidyt.web.app
 
 ---
 
-## Design System
+## Infraestructura
 
-Basado en la identidad visual de Médica Sur, traducido del legacy a Tailwind CSS v4:
-
-- **Primario:** `#0A1F5C` (azul institucional)
-- **Acento:** `#00A651` (verde Médica Sur)
-- **Optimizado para iPad:** targets táctiles 44×44px, densidad compacta, touch-action manipulation
-- **Tipografía:** SF Pro / system-ui a 13px base
+- **Hosting:** Firebase Hosting (SPA estática, sin servidor)
+- **Auth:** Firebase Authentication
+- **Base de datos:** Cloud Firestore
+- **CI/CD:** GitHub Actions + Docker
+- **Secretos:** GCP Secret Manager
+- **IaC:** Terraform (directorio `terraform/`)
+- **Logging:** Cloud Logging (pipeline de deploy)
 
 ---
 
 ## Seguridad
 
 - Sin servidor — la seguridad de datos depende de Firestore Security Rules
-- No se usa Firebase Admin SDK
-- Credenciales nunca se almacenan en el repositorio
+- No se usa Firebase Admin SDK en la app
+- Credenciales almacenadas en GCP Secret Manager
 - `.env.local` excluido via `.gitignore`
 
 ---
