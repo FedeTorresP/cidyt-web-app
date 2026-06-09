@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet } from '@tanstack/react-router'
+import { Outlet, useNavigate } from '@tanstack/react-router'
 import { Menu, LogOut } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useMenu } from '@/hooks/use-menu'
@@ -10,12 +10,18 @@ import { AlertBanner } from '@/components/shared/AlertBanner'
 import { cn } from '@/lib/utils'
 
 export function AppShell() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { data: menuItems, isLoading: menuLoading, error: menuError } = useMenu()
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
   const handleLogout = async () => {
-    await logout()
+    try {
+      await logout()
+    } finally {
+      sessionStorage.removeItem('cidyt_turno')
+      navigate({ to: '/login' })
+    }
   }
 
   return (

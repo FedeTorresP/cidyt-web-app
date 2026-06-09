@@ -15,4 +15,14 @@ export default defineConfig({
       '@': resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          'vendor-tanstack': ['@tanstack/react-router', '@tanstack/react-query', '@tanstack/react-table'],
+        },
+      },
+    },
+  },
 })

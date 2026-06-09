@@ -169,6 +169,41 @@ El deploy es automático al hacer push a `main`:
 
 ---
 
+## Convención de Commits
+
+Se usa [Conventional Commits](https://www.conventionalcommits.org/). Formato:
+
+```
+tipo(scope): descripción corta
+```
+
+| Tipo | Cuándo usar | Ejemplo |
+|------|-------------|---------|
+| `feat` | Nueva funcionalidad o componente | `feat: add cubiculos grid view` |
+| `fix` | Corrección de bug | `fix: resolve auth/invalid-api-key on deploy` |
+| `docs` | Cambios en documentación | `docs: update README with deploy instructions` |
+| `style` | Cambios de formato/estilos (sin lógica) | `style: adjust card padding for iPad grid` |
+| `refactor` | Reestructura de código sin cambiar comportamiento | `refactor: extract DataTable into shared component` |
+| `ci` | Cambios en CI/CD o pipelines | `ci: add Firebase Hosting deploy pipeline` |
+| `chore` | Tareas de mantenimiento, deps, configs | `chore: bump firebase to 11.10` |
+| `perf` | Mejora de rendimiento | `perf: lazy load reportes route` |
+
+**Scope** (opcional): módulo afectado entre paréntesis.
+
+```
+fix(auth): handle expired token on page reload
+feat(caja): add factura search by folio
+ci(docker): add route tree generation step
+```
+
+**Reglas:**
+- Primera línea ≤ 72 caracteres
+- Verbo en imperativo inglés: "add", "fix", "update" (no "added", "fixing")
+- Sin punto final
+- Si el cambio es breaking, agregar `!` después del tipo: `feat!: migrate auth to client SDK`
+
+---
+
 ## Licencia
 
 Uso interno — Propiedad de Médica Sur. Todos los derechos reservados.
