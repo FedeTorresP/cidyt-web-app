@@ -16,6 +16,9 @@ RUN npm ci --ignore-scripts
 # Copy source code
 COPY . .
 
+# Generate TanStack Router route tree (needed before tsc)
+RUN npx tsr generate
+
 # Build the application
 RUN npm run build
 
