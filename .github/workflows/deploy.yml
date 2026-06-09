@@ -1,0 +1,121 @@
+name: Build & Deploy to Firebase Hosting
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: ipad-cidyt
+  FIREBASE_SITE: ipad-cidyt
+  LOG_NAME: cidyt-deploy
+
+jobs:
+  build-and-deploy:
+    name: Build, Deploy & Log
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # ─── Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ─── Authenticate with GCP ──────────────────────────────────────────
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      # ─── Setup gcloud CLI ───────────────────────────────────────────────
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      # ─── Log: Pipeline started ──────────────────────────────────────────
+      - name: "Log: Pipeline started"
+        run: |
+          gcloud logging write ${{ env.LOG_NAME }} \
+            '{"severity":"INFO","message":"Pipeline started","commit":"${{ github.sha }}","ref":"${{ github.ref }}","actor":"${{ github.actor }}","run_id":"${{ github.run_id }}","status":"started"}' \
+            --project=${{ env.PROJECT_ID }} \
+            --severity=INFO \
+            --payload-type=json
+
+      # ─── Fetch Firebase config from Secret Manager ──────────────────────
+      - name: Fetch Firebase config from Secret Manager
+        run: |
+          echo "::group::Fetching FIREBASE_CONFIG_SECRET"
+          gcloud secrets versions access latest \
+            --secret="FIREBASE_CONFIG_SECRET" \
+            --project="734571015446" > .env.local
+          echo "::endgroup::"
+          echo "::notice::.env.local written from Secret Manager ($(wc -l < .env.local) lines)"
+
+          gcloud logging write ${{ env.LOG_NAME }} \
+            '{"severity":"INFO","message":"Firebase config fetched from Secret Manager","commit":"${{ github.sha }}","status":"in_progress"}' \
+            --project=${{ env.PROJECT_ID }} \
+            --severity=INFO \
+            --payload-type=json
+
+      # ─── Build with Docker ──────────────────────────────────────────────
+      - name: Build app with Docker
+        run: |
+          echo "::group::Docker Build"
+          docker build -t ipad-cidyt:${{ github.sha }} .
+          echo "::endgroup::"
+
+          gcloud logging write ${{ env.LOG_NAME }} \
+            '{"severity":"INFO","message":"Docker build completed","commit":"${{ github.sha }}","image_tag":"${{ github.sha }}","status":"in_progress"}' \
+            --project=${{ env.PROJECT_ID }} \
+            --severity=INFO \
+            --payload-type=json
+
+      # ─── Extract dist/ from Docker image ────────────────────────────────
+      - name: Extract build artifacts from Docker
+        run: |
+          CONTAINER_ID=$(docker create ipad-cidyt:${{ github.sha }})
+          docker cp "$CONTAINER_ID:/app/dist" ./dist
+          docker rm "$CONTAINER_ID"
+          echo "::notice::Extracted dist/ directory ($(du -sh dist | cut -f1))"
+          ls -la dist/
+
+      # ─── Deploy to Firebase Hosting ─────────────────────────────────────
+      - name: Deploy to Firebase Hosting
+        run: |
+          echo "::group::Firebase Deploy"
+          npx firebase-tools deploy \
+            --only hosting \
+            --project ${{ env.PROJECT_ID }} \
+            --message "Deploy ${{ github.sha }} by ${{ github.actor }}" \
+            --non-interactive
+          echo "::endgroup::"
+
+          gcloud logging write ${{ env.LOG_NAME }} \
+            '{"severity":"INFO","message":"Firebase Hosting deploy successful","commit":"${{ github.sha }}","actor":"${{ github.actor }}","site":"${{ env.FIREBASE_SITE }}","status":"success"}' \
+            --project=${{ env.PROJECT_ID }} \
+            --severity=INFO \
+            --payload-type=json
+
+      # ─── Log: Pipeline completed ────────────────────────────────────────
+      - name: "Log: Pipeline completed"
+        if: success()
+        run: |
+          gcloud logging write ${{ env.LOG_NAME }} \
+            '{"severity":"INFO","message":"Pipeline completed successfully","commit":"${{ github.sha }}","run_id":"${{ github.run_id }}","url":"https://${{ env.FIREBASE_SITE }}.web.app","status":"success"}' \
+            --project=${{ env.PROJECT_ID }} \
+            --severity=INFO \
+            --payload-type=json
+
+      # ─── Log: Pipeline failed ───────────────────────────────────────────
+      - name: "Log: Pipeline failed"
+        if: failure()
+        run: |
+          gcloud logging write ${{ env.LOG_NAME }} \
+            '{"severity":"ERROR","message":"Pipeline failed","commit":"${{ github.sha }}","run_id":"${{ github.run_id }}","actor":"${{ github.actor }}","status":"failure"}' \
+            --project=${{ env.PROJECT_ID }} \
+            --severity=ERROR \
+            --payload-type=json

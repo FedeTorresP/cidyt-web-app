@@ -21,3 +21,13 @@ npm-debug.log*
 
 # TanStack Router generated
 src/routeTree.gen.ts
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+
+# Firebase
+.firebase/
+.firebaserc.bak
