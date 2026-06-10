@@ -2,7 +2,8 @@ import { createLazyFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { useFacturas, type FilaCaja } from '@/hooks/use-facturas'
-import { getDayRangeUtc, getTodayLocalDate, toLocalString } from '@/services/time'
+import { getDayRangeUtc } from '@/services/time'
+import { nowMX, formatDateMX, formatTimeMX } from '@/lib/timezone'
 import { DataTable } from '@/components/shared/DataTable'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,13 +34,13 @@ const columns: ColumnDef<FilaCaja, unknown>[] = [
     header: 'Fecha Ingreso',
     cell: ({ getValue }) => {
       const date = getValue() as Date | null
-      return date ? toLocalString(date, { hour: '2-digit', minute: '2-digit' }) : '—'
+      return date ? `${formatDateMX(date)} ${formatTimeMX(date)}` : '—'
     },
   },
 ]
 
 function CajaPage() {
-  const [fecha, setFecha] = useState(getTodayLocalDate())
+  const [fecha, setFecha] = useState(() => formatDateMX(nowMX()))
   const rango = getDayRangeUtc(fecha)
   const { data, isLoading, error, refetch } = useFacturas(rango.startUtc, rango.endUtc)
 

@@ -12,7 +12,8 @@ import {
   Timestamp,
 } from 'firebase/firestore'
 import { getFirebaseFirestore } from '@/lib/firebase'
-import { getDayRangeUtc, getTodayLocalDate } from '@/services/time'
+import { getDayRangeUtc } from '@/services/time'
+import { nowMX, formatDateMX } from '@/lib/timezone'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -127,7 +128,7 @@ async function fetchListaDia(fecha: string): Promise<{ filas: FilaListaDia[]; es
 }
 
 function ListaDiaPage() {
-  const [fecha, setFecha] = useState(getTodayLocalDate())
+  const [fecha, setFecha] = useState(() => formatDateMX(nowMX()))
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['lista-dia', fecha],
     queryFn: () => fetchListaDia(fecha),

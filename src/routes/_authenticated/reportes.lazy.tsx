@@ -10,7 +10,8 @@ import {
   type FilaEstadistica,
   type RangoUtc,
 } from '@/hooks/use-reportes'
-import { getDayRangeUtc, getTodayLocalDate, toLocalString } from '@/services/time'
+import { getDayRangeUtc } from '@/services/time'
+import { nowMX, formatDateMX, formatTimeMX } from '@/lib/timezone'
 import { DataTable } from '@/components/shared/DataTable'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,7 +29,10 @@ const checkupColumns: ColumnDef<FilaCheckup, unknown>[] = [
   {
     accessorKey: 'fechaIngresoLocal',
     header: 'Ingreso',
-    cell: ({ getValue }) => toLocalString(getValue() as Date, { hour: '2-digit', minute: '2-digit' }),
+    cell: ({ getValue }) => {
+      const date = getValue() as Date
+      return `${formatDateMX(date)} ${formatTimeMX(date)}`
+    },
   },
   { accessorKey: 'estatusSeguimientoNombre', header: 'Estatus' },
   { accessorKey: 'totalEstudios', header: 'Estudios' },
@@ -39,7 +43,10 @@ const generalColumns: ColumnDef<FilaGeneral, unknown>[] = [
   {
     accessorKey: 'fechaIngresoLocal',
     header: 'Ingreso',
-    cell: ({ getValue }) => toLocalString(getValue() as Date, { hour: '2-digit', minute: '2-digit' }),
+    cell: ({ getValue }) => {
+      const date = getValue() as Date
+      return `${formatDateMX(date)} ${formatTimeMX(date)}`
+    },
   },
   { accessorKey: 'estatusSeguimientoNombre', header: 'Estatus' },
   { accessorKey: 'empresaNombre', header: 'Empresa', cell: ({ getValue }) => getValue() ?? '—' },
@@ -54,8 +61,8 @@ const estadisticaColumns: ColumnDef<FilaEstadistica, unknown>[] = [
 
 function ReportesPage() {
   const [tipo, setTipo] = useState<TipoReporte>('checkup')
-  const [fechaInicio, setFechaInicio] = useState(getTodayLocalDate())
-  const [fechaFin, setFechaFin] = useState(getTodayLocalDate())
+  const [fechaInicio, setFechaInicio] = useState(() => formatDateMX(nowMX()))
+  const [fechaFin, setFechaFin] = useState(() => formatDateMX(nowMX()))
   const [rango, setRango] = useState<RangoUtc | null>(null)
 
   const checkup = useReporteCheckup(tipo === 'checkup' ? rango : null)

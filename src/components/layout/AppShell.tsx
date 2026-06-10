@@ -138,31 +138,32 @@ export function AppShell() {
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="fixed top-2 z-[201] flex items-center justify-center"
           style={{
-            left: sidebarOpen ? 164 : 8,
-            width: 36,
-            height: 36,
+            left: sidebarOpen ? 156 : 8,
+            width: 44,
+            height: 44,
             backgroundColor: 'var(--color-primario)',
             color: '#fff',
             border: 'none',
             borderRadius: 'var(--radius-default)',
             touchAction: 'manipulation',
             transition: 'left 0.25s ease',
+            boxShadow: '0 2px 8px rgba(10,31,92,0.25)',
           }}
           aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
           aria-expanded={sidebarOpen}
         >
           {sidebarOpen ? (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           ) : (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
+              <line x1="4" y1="6" x2="20" y2="6" />
+              <line x1="4" y1="12" x2="20" y2="12" />
+              <line x1="4" y1="18" x2="20" y2="18" />
             </svg>
           )}
         </button>
