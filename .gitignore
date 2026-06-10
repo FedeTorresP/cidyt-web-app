@@ -31,3 +31,12 @@ terraform/.terraform.lock.hcl
 # Firebase
 .firebase/
 .firebaserc.bak
+
+# SAP Integration Service — secretos y artefactos
+sap-integration-service/.env
+sap-integration-service/secrets/
+sap-integration-service/**/serviceAccount.json
+sap-integration-service/**/*.serviceaccount.json
+sap-integration-service/**/sa.json
+sap-integration-service/.venv/
+sap-integration-service/__pycache__/
