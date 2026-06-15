@@ -5,6 +5,32 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.1.0] — 2026-06-15 [`f1ffc35`...`55d3702`](https://github.com/Medica-Sur-TI/cidyt-web-app/compare/f1ffc35...55d3702)
+
+### Mi Perfil y Accesos, SAP Integration ADC, Timezone Utility
+
+#### Agregado
+- **Página unificada "Mi Perfil y Accesos"** (`/mi-perfil`): consolida las pantallas `/cambio-clave` y `/admin/usuarios` en una sola vista con control segmentado (Tabs) estilo Apple HIG
+- **Tab Mi Perfil** (todos los roles): correo institucional y No. Empleado en solo lectura, edición de nombre con cuadrícula de 3 campos (Nombre, Apellido Paterno, Apellido Materno), cambio de contraseña vía Firebase Auth
+- **Tab Gestión de Usuarios** (solo admin): TanStack Table con buscador global, ordenamiento por columnas, DropdownMenu de acciones (Editar, Enviar enlace de acceso, Desactivar)
+- **Estrategia de campos aditivos**: escritura simultánea de `nombre`, `apellidoPaterno`, `apellidoMaterno` junto a `nombreCompleto` (fuente de verdad) — cero migración de documentos legacy
+- **Normalización NFC** obligatoria en todos los campos de texto libre antes de escribir a Firestore
+- **Flujo de alta ABM**: sin campo de password manual, disparo automático de `sendPasswordResetEmail` al crear usuario
+- **PERFIL_COLORS**: constante con formas geométricas (rombos, triángulos, círculos) y colores por rol para badges
+- Componentes UI reutilizables: `<Tabs>`, `<DropdownMenu>`, `<Dialog>` (patrones shadcn, Tailwind CSS puro + Radix)
+- Footer corporativo global en AppShell: "Desarrollado por: Médica Sur – Sistemas y T.I. · Copyright © {año}"
+- **SAP Integration Service**: soporte para Application Default Credentials (ADC) en despliegues GCP (Cloud Run / GKE / GCE) sin necesidad de JSON de Service Account
+- **Timezone utility** (`src/lib/timezone.ts`): helpers `nowMX`, `formatDateMX`, `formatTimeMX` con `date-fns-tz` para manejo DST-safe de fechas en zona America/Mexico_City
+
+#### Modificado
+- Menú lateral (FALLBACK_MENU): reemplazadas entradas de "Cambio de Clave" y "Conf Perfiles/Usuario" por "Mi Perfil y Accesos" con ruta `/mi-perfil`
+- Vistas lista-dia, caja y reportes migradas a usar helpers de timezone (eliminado manejo manual de offsets)
+- SAP Integration Service README actualizado con documentación de ambos paths de deployment (Docker Compose local vs Cloud Run)
+- `services/users.ts`: interfaz `UsuarioFirestore` extendida con campos opcionales aditivos
+- `hooks/use-usuarios.ts`: mutaciones actualizadas para aceptar payload de campos desglosados
+
+---
+
 ## [3.0.3] — 2026-06-09 [`9764e5f`...`beb85df`](https://github.com/Medica-Sur-TI/cidyt-web-app/compare/9764e5f...beb85df)
 
 ### Login 2-step flow, Code-Splitting y Sidebar Legacy

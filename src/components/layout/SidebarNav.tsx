@@ -78,7 +78,7 @@ export function SidebarNav({ items, userName, turno }: SidebarNavProps) {
           <LogoMedicaSur size={32} />
         </div>
         <span className="block text-white/45 text-[0.6875rem] mt-0.5 ml-px">
-          v3.0.2
+          v3.1.0
         </span>
 
         {/* ── Bloque 2: Usuario ── */}
