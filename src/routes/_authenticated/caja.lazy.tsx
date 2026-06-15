@@ -46,7 +46,7 @@ function CajaPage() {
 
   return (
     <div className="text-[0.8rem]">
-      <h1 className="text-lg font-bold mb-1.5 text-[var(--color-texto)]">Caja</h1>
+      <h1 className="page-title">Caja</h1>
 
       <div className="sticky top-0 z-20 flex items-center gap-1.5 flex-wrap p-1.5 px-2.5 mb-1.5 bg-[var(--color-fondo-card)] border border-[var(--color-borde)] rounded-[var(--radius-default)] shadow-[0_2px_8px_rgba(10,31,92,0.06)]">
         <span className="text-[var(--color-texto-suave)] font-medium text-[0.8rem]">Fecha:</span>

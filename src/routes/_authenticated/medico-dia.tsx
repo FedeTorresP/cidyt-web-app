@@ -12,7 +12,7 @@ function MedicoDiaPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4 text-[var(--color-texto)]">Médico del Día</h1>
+      <h1 className="page-title">Médico del Día</h1>
 
       {isLoading ? (
         <div className="flex justify-center py-8"><LoadingSpinner size="md" /></div>

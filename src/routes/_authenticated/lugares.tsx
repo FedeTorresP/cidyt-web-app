@@ -8,7 +8,7 @@ export const Route = createFileRoute('/_authenticated/lugares')({
 function LugaresPage() {
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4 text-[var(--color-texto)]">Lugares</h1>
+      <h1 className="page-title">Lugares</h1>
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Catálogo de Lugares</CardTitle>

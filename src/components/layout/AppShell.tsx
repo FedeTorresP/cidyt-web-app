@@ -127,7 +127,7 @@ export function AppShell() {
 
       {/* Main content */}
       <main
-        className="flex-1 flex flex-col bg-[var(--color-fondo)] p-3 lg:p-4 transition-[margin-left] duration-[250ms] ease-in-out"
+        className="flex-1 flex flex-col bg-[var(--color-fondo)] p-4 md:py-6 md:px-10 transition-[margin-left] duration-[250ms] ease-in-out"
         style={{
           minHeight: '100dvh',
           marginLeft: sidebarOpen ? 200 : 0,
@@ -168,7 +168,7 @@ export function AppShell() {
           )}
         </button>
 
-        <div className="flex-1" style={{ paddingTop: 44 }}>
+        <div className="flex-1" style={{ paddingTop: 64, paddingLeft: 24, paddingRight: 24, paddingBottom: 24 }}>
           <Outlet />
         </div>
 

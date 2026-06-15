@@ -51,7 +51,7 @@ function CambioClavePage() {
 
   return (
     <div className="max-w-md">
-      <h1 className="text-xl font-bold mb-4 text-[var(--color-texto)]">Cambiar Contraseña</h1>
+      <h1 className="page-title">Cambiar Contraseña</h1>
 
       <Card>
         <CardHeader>

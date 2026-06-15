@@ -60,7 +60,8 @@ const TabsContent = forwardRef<
     <div
       ref={ref}
       role="tabpanel"
-      className={cn('mt-4 focus-visible:outline-none', className)}
+      className={cn('focus-visible:outline-none', className)}
+      style={{ marginTop: 24 }}
       {...props}
     />
   )

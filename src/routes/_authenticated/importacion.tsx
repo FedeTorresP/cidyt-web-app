@@ -8,7 +8,7 @@ export const Route = createFileRoute('/_authenticated/importacion')({
 function ImportacionPage() {
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4 text-[var(--color-texto)]">Importación</h1>
+      <h1 className="page-title">Importación</h1>
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Importación Masiva de Datos</CardTitle>

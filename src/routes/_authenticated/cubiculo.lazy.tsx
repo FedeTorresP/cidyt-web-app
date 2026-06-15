@@ -45,7 +45,7 @@ function CubiculoPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <h1 className="text-xl font-bold text-[var(--color-texto)]">Cubículos</h1>
+        <h1 className="page-title">Cubículos</h1>
       </div>
 
       {!cubiculos?.length ? (

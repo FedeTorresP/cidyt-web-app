@@ -8,7 +8,7 @@ export const Route = createFileRoute('/_authenticated/cubiculo_/listado')({
 function CubiculoListadoPage() {
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4 text-[var(--color-texto)]">Lista Cubículos</h1>
+      <h1 className="page-title">Lista Cubículos</h1>
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Cubículos y Sesiones</CardTitle>

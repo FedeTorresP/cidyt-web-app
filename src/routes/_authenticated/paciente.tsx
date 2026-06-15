@@ -8,7 +8,7 @@ export const Route = createFileRoute('/_authenticated/paciente')({
 function PacientePage() {
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4 text-[var(--color-texto)]">Registro de Pacientes</h1>
+      <h1 className="page-title">Registro de Pacientes</h1>
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Búsqueda y Registro</CardTitle>

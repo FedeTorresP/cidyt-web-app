@@ -11,7 +11,7 @@ function HomePage() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4 text-[var(--color-texto)]">
+      <h1 className="page-title">
         Bienvenido a IPadCIDyT
       </h1>
 

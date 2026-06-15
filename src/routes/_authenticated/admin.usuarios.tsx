@@ -8,7 +8,7 @@ export const Route = createFileRoute('/_authenticated/admin/usuarios')({
 function UsuariosPage() {
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4 text-[var(--color-texto)]">Gestión de Usuarios</h1>
+      <h1 className="page-title">Gestión de Usuarios</h1>
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Administración de Usuarios</CardTitle>

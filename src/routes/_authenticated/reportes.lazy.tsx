@@ -79,7 +79,7 @@ function ReportesPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4 text-[var(--color-texto)]">Reportes</h1>
+      <h1 className="page-title">Reportes</h1>
 
       <Card className="mb-4">
         <CardHeader>

@@ -210,13 +210,15 @@ function TabMiPerfil() {
   }
 
   return (
-    <div className="max-w-lg mx-auto">
-      {/* ── Bloque: Información Personal ── */}
-      <section
-        className="rounded-2xl border border-[var(--color-borde)] bg-[var(--color-fondo-card)] p-6 mb-6 shadow-[var(--shadow-card)]"
-      >
-        <div className="flex flex-col gap-5">
-          <div className="flex flex-col gap-1.5">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-5xl">
+      {/* ── Columna Izquierda: Datos de Usuario ── */}
+      <section>
+        <h2 className="text-sm font-semibold text-[var(--color-texto)] uppercase tracking-wide mb-8">
+          Datos de Usuario
+        </h2>
+
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-2">
             <label className="text-[13px] font-medium text-[var(--color-texto-suave)]">
               Correo Institucional
             </label>
@@ -229,7 +231,7 @@ function TabMiPerfil() {
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label className="text-[13px] font-medium text-[var(--color-texto-suave)]">
               No. Empleado
             </label>
@@ -242,15 +244,14 @@ function TabMiPerfil() {
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label className="text-[13px] font-medium text-[var(--color-texto-suave)]">
               Nombre Completo
             </label>
             {editingName ? (
-              <div className="flex flex-col gap-5">
-                {/* Contenedor estético de 3 columnas para iPad */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-6">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-2">
                     <label className="text-[13px] font-medium text-[var(--color-texto-suave)]">Nombre(s)</label>
                     <Input 
                       value={nombre} 
@@ -259,7 +260,7 @@ function TabMiPerfil() {
                       className="min-h-[44px] text-sm" 
                     />
                   </div>
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-2">
                     <label className="text-[13px] font-medium text-[var(--color-texto-suave)]">Apellido Paterno</label>
                     <Input 
                       value={apePaterno} 
@@ -267,7 +268,7 @@ function TabMiPerfil() {
                       className="min-h-[44px] text-sm" 
                     />
                   </div>
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-2">
                     <label className="text-[13px] font-medium text-[var(--color-texto-suave)]">Apellido Materno</label>
                     <Input 
                       value={apeMaterno} 
@@ -277,12 +278,12 @@ function TabMiPerfil() {
                   </div>
                 </div>
                 
-                <div className="flex gap-3">
-                  <Button onClick={handleSaveName} disabled={updateNombre.isPending} className="flex-1 min-h-[48px] text-sm">
+                <div className="flex gap-3 mt-8">
+                  <Button onClick={handleSaveName} disabled={updateNombre.isPending} className="min-h-[48px] text-sm px-6">
                     {updateNombre.isPending ? <LoadingSpinner size="sm" className="border-white/35 border-t-white" /> : null}
                     Guardar Nombre
                   </Button>
-                  <Button variant="outline" onClick={() => setEditingName(false)} className="flex-1 min-h-[48px] text-sm">
+                  <Button variant="outline" onClick={() => setEditingName(false)} className="min-h-[48px] text-sm px-6">
                     Cancelar
                   </Button>
                 </div>
@@ -309,23 +310,25 @@ function TabMiPerfil() {
         </div>
       </section>
 
-      {/* ── Bloque: Cambiar Contraseña ── */}
-      <section
-        className="rounded-2xl border border-[var(--color-borde)] bg-[var(--color-fondo-card)] p-6 shadow-[var(--shadow-card)]"
-      >
+      {/* ── Columna Derecha: Seguridad / Contraseñas ── */}
+      <section>
+        <h2 className="text-sm font-semibold text-[var(--color-texto)] uppercase tracking-wide mb-8">
+          Seguridad
+        </h2>
+
         {pwSuccess && (
-          <AlertBanner variant="success" className="mb-4">
+          <AlertBanner variant="success" className="mb-6">
             Contraseña actualizada exitosamente.
           </AlertBanner>
         )}
         {pwError && (
-          <AlertBanner variant="error" className="mb-4">
+          <AlertBanner variant="error" className="mb-6">
             {pwError}
           </AlertBanner>
         )}
 
-        <form onSubmit={handleChangePassword} className="flex flex-col gap-5">
-          <div className="flex flex-col gap-1.5">
+        <form onSubmit={handleChangePassword} className="flex flex-col gap-8">
+          <div className="flex flex-col gap-2">
             <label htmlFor="newPassword" className="text-[13px] font-medium text-[var(--color-texto-suave)]">
               Nueva contraseña
             </label>
@@ -339,7 +342,7 @@ function TabMiPerfil() {
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="confirmPassword" className="text-[13px] font-medium text-[var(--color-texto-suave)]">
               Confirmar nueva contraseña
             </label>
@@ -353,13 +356,14 @@ function TabMiPerfil() {
             />
           </div>
 
-          <Button type="submit" disabled={pwLoading} className="w-full min-h-[48px] text-sm mt-1">
-            {pwLoading ? <LoadingSpinner size="sm" className="border-white/35 border-t-white" /> : null}
-            Guardar Cambios
-          </Button>
+          <div className="mt-8">
+            <Button type="submit" disabled={pwLoading} className="min-h-[48px] text-sm px-6">
+              {pwLoading ? <LoadingSpinner size="sm" className="border-white/35 border-t-white" /> : null}
+              Guardar Cambios
+            </Button>
+          </div>
         </form>
       </section>
-
     </div>
   )
 }
@@ -387,11 +391,13 @@ function TabGestionUsuarios() {
             className="inline-flex items-center gap-1 text-white font-semibold"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           >
-            No. Emp.
+            No. Empleado
             <ArrowUpDown className="h-3 w-3" />
           </button>
         ),
         cell: ({ getValue }) => <span className="font-mono text-xs">{getValue() as string}</span>,
+        size: 100,
+        meta: { style: { width: 100, maxWidth: 100 } },
       },
       {
         accessorKey: 'nombreCompleto',
@@ -404,6 +410,8 @@ function TabGestionUsuarios() {
             <ArrowUpDown className="h-3 w-3" />
           </button>
         ),
+        size: 250,
+        meta: { style: { width: '30%' } },
       },
       {
         accessorKey: 'correoInstitucional',
@@ -419,6 +427,8 @@ function TabGestionUsuarios() {
         cell: ({ getValue }) => (
           <span className="text-xs text-[var(--color-texto-suave)]">{getValue() as string}</span>
         ),
+        size: 250,
+        meta: { style: { width: '30%' } },
       },
       {
         accessorKey: 'perfilNombre',
@@ -515,14 +525,14 @@ function TabGestionUsuarios() {
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-texto-suave)]" />
           <Input
             placeholder="Buscar por nombre o correo..."
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="pl-8"
+            style={{ paddingRight: 36 }}
             aria-label="Buscar usuario"
           />
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-texto-suave)]" style={{ pointerEvents: 'none' }} />
         </div>
         <Button onClick={() => setShowCreateDialog(true)}>
           <Plus className="h-4 w-4" />
@@ -532,7 +542,15 @@ function TabGestionUsuarios() {
 
       {/* Tabla TanStack */}
       <div className="overflow-x-auto rounded-[var(--radius-default)] shadow-[var(--shadow-card)] border border-[var(--color-borde)]">
-        <table className="w-full border-collapse bg-[var(--color-fondo-card)] min-w-[800px]">
+        <table className="w-full border-collapse bg-[var(--color-fondo-card)] min-w-[800px]" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: 100 }} />
+            <col style={{ width: '30%' }} />
+            <col style={{ width: '30%' }} />
+            <col style={{ width: 90 }} />
+            <col style={{ width: 80 }} />
+            <col style={{ width: 50 }} />
+          </colgroup>
           <thead className="bg-[var(--color-primario)] sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
@@ -540,6 +558,7 @@ function TabGestionUsuarios() {
                   <th
                     key={header.id}
                     className="px-2 py-1.5 text-xs text-center font-semibold text-white border-b-2 border-b-white/12 border-r border-r-white/8"
+                    style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
                   >
                     {header.isPlaceholder
                       ? null
@@ -865,11 +884,11 @@ function MiPerfilPage() {
   const [activeTab, setActiveTab] = useState<'perfil' | 'usuarios'>('perfil')
 
   return (
-    <div className="w-full max-w-4xl">
-      <h1 className="text-xl font-bold mb-5 text-[var(--color-texto)]">Mi Perfil y Accesos</h1>
+    <div style={{ width: '100%' }}>
+      <h1 className="page-title">Mi Perfil y Accesos</h1>
 
       <Tabs>
-        <TabsList className="mb-2">
+        <TabsList style={{ marginBottom: 24 }}>
           <TabsTrigger active={activeTab === 'perfil'} onClick={() => setActiveTab('perfil')}>
             Mi Perfil
           </TabsTrigger>

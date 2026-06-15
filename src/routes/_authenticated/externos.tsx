@@ -8,7 +8,7 @@ export const Route = createFileRoute('/_authenticated/externos')({
 function ExternosPage() {
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4 text-[var(--color-texto)]">Externos</h1>
+      <h1 className="page-title">Externos</h1>
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Pacientes Externos</CardTitle>

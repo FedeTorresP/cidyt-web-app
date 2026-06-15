@@ -18,7 +18,7 @@ const catalogos = [
 function CatalogosPage() {
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4 text-[var(--color-texto)]">Catálogos</h1>
+      <h1 className="page-title">Catálogos</h1>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
         {catalogos.map((cat) => (
