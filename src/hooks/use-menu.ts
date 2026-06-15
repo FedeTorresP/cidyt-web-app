@@ -23,12 +23,9 @@ const FALLBACK_MENU: NavMenuItem[] = [
   { id: 'fb-4', label: 'Lugares', route: '/lugares', displayOrder: 4 },
   { id: 'fb-5', label: 'Registro Estudios Externos', route: '/externos', displayOrder: 5 },
   { id: 'fb-6', label: 'Reportería', route: '/reportes', displayOrder: 6 },
-  { id: 'fb-7', label: 'Cambio de Clave', route: '/cambio-clave', displayOrder: 7 },
-  { id: 'fb-8', label: 'Conf Perfiles/Usuario', route: '/admin/usuarios', displayOrder: 8 },
-  { id: 'fb-9', label: 'Lista Cubículos', route: '/cubiculo/listado', displayOrder: 9 },
-  { id: 'fb-10', label: 'Médico por Día', route: '/medico-dia', displayOrder: 10 },
-  { id: 'fb-11', label: 'Crear Paquetes', route: '/paquetes', displayOrder: 11 },
-  { id: 'fb-12', label: 'Importar Citas', route: '/importacion', displayOrder: 12 },
+  { id: 'fb-7', label: 'Mi Perfil y Accesos', route: '/mi-perfil', displayOrder: 7 },
+  { id: 'fb-9', label: 'Lista Cubículos', route: '/cubiculo/listado', displayOrder: 8 },
+  { id: 'fb-11', label: 'Crear Paquetes', route: '/paquetes', displayOrder: 9 },
 ]
 
 async function fetchMenu(roleId: string, isSuperAdmin: boolean): Promise<NavMenuItem[]> {

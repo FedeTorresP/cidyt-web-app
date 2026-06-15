@@ -127,7 +127,7 @@ export function AppShell() {
 
       {/* Main content */}
       <main
-        className="flex-1 bg-[var(--color-fondo)] p-3 lg:p-4 transition-[margin-left] duration-[250ms] ease-in-out"
+        className="flex-1 flex flex-col bg-[var(--color-fondo)] p-3 lg:p-4 transition-[margin-left] duration-[250ms] ease-in-out"
         style={{
           minHeight: '100dvh',
           marginLeft: sidebarOpen ? 200 : 0,
@@ -168,9 +168,14 @@ export function AppShell() {
           )}
         </button>
 
-        <div style={{ paddingTop: 44 }}>
+        <div className="flex-1" style={{ paddingTop: 44 }}>
           <Outlet />
         </div>
+
+        {/* Footer corporativo */}
+        <footer className="text-center text-[11px] text-[var(--color-texto-suave)] py-6 mt-auto">
+          Desarrollado por: Médica Sur – Sistemas y T.I. · Copyright © {new Date().getFullYear()}. All rights reserved.
+        </footer>
       </main>
     </div>
   )
