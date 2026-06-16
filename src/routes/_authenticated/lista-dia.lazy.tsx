@@ -1,241 +1,548 @@
 import { createLazyFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  doc,
-  getDoc,
-  Timestamp,
-} from 'firebase/firestore'
-import { getFirebaseFirestore } from '@/lib/firebase'
-import { getDayRangeUtc } from '@/services/time'
-import { nowMX, formatDateMX } from '@/lib/timezone'
+import { useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { AlertBanner } from '@/components/shared/AlertBanner'
-import { cn } from '@/lib/utils'
+import { nowMX, formatDateMX } from '@/lib/timezone'
 
 export const Route = createLazyFileRoute('/_authenticated/lista-dia')({
   component: ListaDiaPage,
 })
 
-interface FilaListaDia {
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONSTANTES — Estudios, Estatus, Desayuno, Colores
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Los 20 estudios del sistema en orden de columna (Orden_Est). */
+const ESTUDIOS_COLUMNAS = [
+  { id: 1, abrev: 'LAB', nombre: 'Laboratorios', orden: 1 },
+  { id: 2, abrev: 'TOR', nombre: 'Torax', orden: 2 },
+  { id: 3, abrev: 'ABD', nombre: 'US. Abdomen', orden: 3 },
+  { id: 4, abrev: 'MAM', nombre: 'US. Mamario', orden: 4 },
+  { id: 5, abrev: 'MAS', nombre: 'Mastografía', orden: 5 },
+  { id: 6, abrev: 'CT', nombre: 'CT', orden: 6 },
+  { id: 7, abrev: 'ORT', nombre: 'Ortopantomografía', orden: 7 },
+  { id: 8, abrev: 'DEN', nombre: 'Densitometría', orden: 8 },
+  { id: 9, abrev: 'ESP', nombre: 'Espirometría', orden: 9 },
+  { id: 19, abrev: 'EKG', nombre: 'Electrocardiograma', orden: 10 },
+  { id: 10, abrev: 'E+P', nombre: 'Ecocardiograma + Prueba', orden: 11 },
+  { id: 11, abrev: 'COL', nombre: 'Colposcopía', orden: 12 },
+  { id: 12, abrev: 'PAP', nombre: 'Papanicolaou', orden: 13 },
+  { id: 13, abrev: 'AUD', nombre: 'Audiometría', orden: 14 },
+  { id: 14, abrev: 'DNT', nombre: 'Dental', orden: 15 },
+  { id: 15, abrev: 'OFT', nombre: 'Oftalmología', orden: 16 },
+  { id: 16, abrev: 'NUT', nombre: 'Nutrición', orden: 17 },
+  { id: 17, abrev: 'OTP', nombre: 'Otorrinolaringología', orden: 18 },
+  { id: 18, abrev: 'PRO', nombre: 'Proctología', orden: 19 },
+  { id: 20, abrev: 'FIB', nombre: 'Fibroscopía', orden: 20 },
+] as const
+
+/** Estatus de estudio — colores y letra para cuadro sólido. */
+const ESTATUS_ESTUDIO = [
+  { id: 0, nombre: 'Sin Estatus', color: 'transparent', letra: '', esBorde: true },
+  { id: 1, nombre: 'No Incluido', color: 'transparent', letra: '', esBorde: true },
+  { id: 2, nombre: 'En Espera', color: '#1976D2', letra: 'E', esBorde: false },
+  { id: 3, nombre: 'En Proceso', color: '#facc15', letra: '', esBorde: false },
+  { id: 4, nombre: 'Completo', color: '#00A651', letra: 'C', esBorde: false },
+  { id: 5, nombre: 'Pendiente', color: '#7B1FA2', letra: 'P', esBorde: false },
+  { id: 6, nombre: 'No Acepta', color: '#D32F2F', letra: 'N', esBorde: false },
+  { id: 7, nombre: 'Cambio Estudio', color: '#0288D1', letra: 'C', esBorde: false },
+  { id: 8, nombre: 'Estudio Combinado', color: '#873600', letra: '', esBorde: false },
+] as const
+
+/** Opciones de desayuno. */
+const DESAYUNO_OPCIONES = [
+  { value: 0, label: 'No', color: '#D32F2F' },
+  { value: 1, label: 'En Proceso', color: '#facc15' },
+  { value: 2, label: 'Sí', color: '#00A651' },
+] as const
+
+/** Leyenda de colores (se muestra arriba de la tabla). */
+const LEYENDA = [
+  { nombre: 'No Incluido', color: '#374151' },
+  { nombre: 'En Espera', color: '#1976D2' },
+  { nombre: 'En Proceso', color: '#facc15' },
+  { nombre: 'Completo', color: '#00A651' },
+  { nombre: 'Pendiente', color: '#7B1FA2' },
+  { nombre: 'No Acepta', color: '#D32F2F' },
+  { nombre: 'Estudio Combinado', color: '#873600' },
+  { nombre: 'Estudios Adicionales', color: '#E65100' },
+] as const
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATOS HARDCODEADOS — 15 pacientes (NO se despliegan hasta indicación)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+interface PacienteListaDia {
   seguimientoId: string
-  pacienteNombre: string
   turno: number
-  estudios: Array<{
-    id: string
-    estudioId: string
-    abreviatura: string
-    estatusColor: string
-    estatusAbrev: string
-  }>
+  nombre: string
+  desayuno: 0 | 1 | 2
+  estatusValpac: 0 | 1 | 2
+  padecimientoId: number
+  medicoInternista: string | null
+  paqueteId: string
+  paqueteNombre: string
+  edad: number
+  peso: number
+  talla: number
+  fechaEntrega: string | null
+  horaEntrega: string | null
+  tarjetaEntRes: 0 | 1 | 2
+  tieneAdicionales: boolean
+  estudios: Record<number, number> // estudioId → estatusId
 }
 
-function buildPacienteNombre(data: Record<string, unknown>): string {
-  const parts: string[] = []
-  if (data.nombre1) parts.push(String(data.nombre1))
-  if (data.nombre2) parts.push(String(data.nombre2))
-  if (data.apePaterno) parts.push(String(data.apePaterno))
-  if (data.apeMaterno) parts.push(String(data.apeMaterno))
-  return parts.join(' ')
-}
+const _PACIENTES_HARDCODED: PacienteListaDia[] = [
+  // Para activar: cambiar inicialización de `pacientes` state a `_PACIENTES_HARDCODED`.
+  { seguimientoId: '73605', turno: 1, nombre: 'ALFREDO CANO JAUREGUI SEGURA MILLAN', desayuno: 0, estatusValpac: 2, padecimientoId: 0, medicoInternista: 'NEGREROS BALVANERA FABIOLA', paqueteId: 'DT0066', paqueteNombre: 'CHECK UP EMPRESA D', edad: 41, peso: 0, talla: 0, fechaEntrega: 'Tue Dec 31', horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: true, estudios: { 1: 4, 2: 4, 3: 2, 4: 1, 5: 1, 6: 1, 7: 4, 8: 1, 9: 6, 19: 6, 10: 1, 11: 1, 12: 1, 13: 6, 14: 1, 15: 4, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73607', turno: 2, nombre: 'SIXTA GUTIERREZ RIVERA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 50, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73608', turno: 3, nombre: 'ASAHI TOSHIYA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0040', paqueteNombre: 'CHECK UP EMPRESA C', edad: 45, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2, 7: 1, 8: 1, 9: 2, 19: 2, 10: 2, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73609', turno: 4, nombre: 'VERONICA ADRIANA BAÑUELOS SANCHEZ', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 38, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2, 7: 1, 8: 2, 9: 1, 19: 2, 10: 1, 11: 4, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73610', turno: 5, nombre: 'MARIO DE MARCHIS PARESCHI', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 55, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73611', turno: 6, nombre: 'MARIA GUADALUPE RUIZ DEL RIO', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 42, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73612', turno: 7, nombre: 'SABINA GARCIA ORTEGA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0066', paqueteNombre: 'CHECK UP EMPRESA D', edad: 48, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 4, 2: 2, 3: 2, 4: 2, 5: 2, 6: 1, 7: 1, 8: 2, 9: 1, 19: 2, 10: 1, 11: 5, 12: 5, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73613', turno: 8, nombre: 'JESUS AUGUSTO CARMONA COLINA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 60, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73614', turno: 9, nombre: 'JAIME VELAZQUEZ BERUMEN', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 37, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 6, 10: 1, 11: 1, 12: 1, 13: 6, 14: 1, 15: 6, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73615', turno: 10, nombre: 'HEIDI PRAGER GUZMAN', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0040', paqueteNombre: 'CHECK UP EMPRESA C', edad: 44, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 4, 2: 2, 3: 2, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 6, 12: 6, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73616', turno: 11, nombre: 'MARIO ALFREDO DONIZ ISLAS', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 52, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 4, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 4, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73617', turno: 12, nombre: 'JOSE LUIS RAMIREZ PALOMARES', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 47, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73618', turno: 13, nombre: 'RICARDO EDDY MONTERRUBIO MORENO', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 35, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73619', turno: 14, nombre: 'MONICA ALVAREZ RIOS', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 39, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+  { seguimientoId: '73620', turno: 15, nombre: 'MARIO LUIS PRADO BABAYAN', desayuno: 0, estatusValpac: 0, padecimientoId: 1, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 58, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
+]
 
-async function fetchListaDia(fecha: string): Promise<{ filas: FilaListaDia[]; estudiosUnicos: string[] }> {
-  const db = getFirebaseFirestore()
-  const rango = getDayRangeUtc(fecha)
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENTE — Modal Datos del Paciente
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-  const segSnap = await getDocs(
-    query(
-      collection(db, 'seguimientos'),
-      where('activo', '==', true),
-      where('fechaIngresoUtc', '>=', Timestamp.fromDate(rango.startUtc)),
-      where('fechaIngresoUtc', '<=', Timestamp.fromDate(rango.endUtc)),
-      orderBy('fechaIngresoUtc', 'asc'),
-    ),
+function ModalDatosPaciente({
+  paciente,
+  onClose,
+}: {
+  paciente: PacienteListaDia
+  onClose: () => void
+}) {
+  const desayunoOpt = DESAYUNO_OPCIONES.find((d) => d.value === paciente.desayuno)
+  const tarjetaLabel = paciente.tarjetaEntRes === 0 ? 'No' : paciente.tarjetaEntRes === 1 ? 'Sí' : 'Enviado'
+  const tarjetaColor = paciente.tarjetaEntRes === 0 ? '#D32F2F' : '#00A651'
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[var(--color-fondo-card)] rounded-lg shadow-xl w-[90vw] max-w-[540px] max-h-[85vh] overflow-y-auto p-6 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between mb-4">
+          <h2 className="text-sm font-semibold text-[var(--color-texto-suave)]">Datos del Paciente</h2>
+          <button
+            onClick={onClose}
+            className="text-[var(--color-texto-suave)] hover:text-[var(--color-texto)] text-xl leading-none p-1"
+            aria-label="Cerrar"
+          >
+            ✕
+          </button>
+        </div>
+
+        <h3 className="text-lg font-bold text-[var(--color-texto)] mb-4">{paciente.nombre}</h3>
+
+        {/* Row 1: Paquete + Desayuno */}
+        <div className="grid grid-cols-[1fr_1.5fr_auto] gap-3 mb-3">
+          <div>
+            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">ID Paquete</span>
+            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.paqueteId}</span>
+          </div>
+          <div>
+            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Paquete</span>
+            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.paqueteNombre}</span>
+          </div>
+          <div>
+            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Desayuno</span>
+            <span
+              className="text-[0.75rem] font-bold text-white rounded px-2 py-1 block text-center"
+              style={{ backgroundColor: desayunoOpt?.color ?? '#666' }}
+            >
+              {desayunoOpt?.label ?? '—'}
+            </span>
+          </div>
+        </div>
+
+        {/* Médico Internista */}
+        <div className="mb-3">
+          <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Médico Internista</span>
+          <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">
+            {paciente.medicoInternista ?? '—'}
+          </span>
+        </div>
+
+        {/* Row 2: Edad, Peso, Talla */}
+        <div className="grid grid-cols-3 gap-3 mb-3">
+          <div>
+            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Edad</span>
+            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.edad}</span>
+          </div>
+          <div>
+            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Peso</span>
+            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.peso.toFixed(2)} Kg</span>
+          </div>
+          <div>
+            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Talla</span>
+            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.talla.toFixed(2)} cm</span>
+          </div>
+        </div>
+
+        {/* Padecimientos */}
+        <div className="mb-3">
+          <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Padecimientos</span>
+          <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">
+            {paciente.padecimientoId > 0 ? `Padecimiento #${paciente.padecimientoId}` : 'Ninguno'}
+          </span>
+        </div>
+
+        {/* Row 3: Fecha Entrega, Hora, Tarjeta */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div>
+            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Fecha Entrega</span>
+            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.fechaEntrega ?? '—'}</span>
+          </div>
+          <div>
+            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Hora Entrega</span>
+            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.horaEntrega ?? '—'}</span>
+          </div>
+          <div>
+            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Tarjeta Entrega de Resultados</span>
+            <span
+              className="text-[0.75rem] font-bold text-white rounded px-2 py-1 block text-center"
+              style={{ backgroundColor: tarjetaColor }}
+            >
+              {tarjetaLabel}
+            </span>
+          </div>
+        </div>
+
+        {/* Estudios Adicionales */}
+        <div className="border-t border-[var(--color-borde)] pt-3 mb-4">
+          <h4 className="text-sm font-semibold text-[var(--color-texto)] mb-2">Estudios Adicionales</h4>
+          <p className="text-[0.8rem] text-[var(--color-texto-suave)] bg-[var(--color-fondo)] rounded px-2 py-2">
+            No se encontró ningún resultado
+          </p>
+        </div>
+
+        {/* Botón cerrar */}
+        <div className="flex justify-end">
+          <Button size="sm" onClick={onClose}>Cerrar</Button>
+        </div>
+      </div>
+    </div>
   )
-
-  if (segSnap.empty) return { filas: [], estudiosUnicos: [] }
-
-  const [estudiosSnap, estatusSnap] = await Promise.all([
-    getDocs(query(collection(db, 'estudios'), where('activo', '==', true))),
-    getDocs(query(collection(db, 'estatus_estudio'), where('activo', '==', true))),
-  ])
-
-  const estudiosMap = new Map<string, { nombre: string; abreviatura: string }>()
-  for (const d of estudiosSnap.docs) {
-    const data = d.data()
-    estudiosMap.set(d.id, { nombre: data.nombre ?? '', abreviatura: data.abreviatura ?? '' })
-  }
-
-  const estatusMap = new Map<string, { color: string; abreviatura: string }>()
-  for (const d of estatusSnap.docs) {
-    const data = d.data()
-    estatusMap.set(d.id, { color: data.color ?? '#666', abreviatura: data.abreviatura ?? '' })
-  }
-
-  const estudiosUnicosSet = new Set<string>()
-  const filas: FilaListaDia[] = []
-
-  let turno = 1
-  for (const segDoc of segSnap.docs) {
-    const segData = segDoc.data()
-
-    let pacienteNombre = ''
-    if (segData.pacienteId) {
-      const pacDoc = await getDoc(doc(db, 'pacientes', segData.pacienteId))
-      if (pacDoc.exists()) {
-        pacienteNombre = buildPacienteNombre(pacDoc.data()!)
-      }
-    }
-
-    const epSnap = await getDocs(
-      query(
-        collection(db, 'estudios_paciente'),
-        where('seguimientoId', '==', segDoc.id),
-        where('activo', '==', true),
-      ),
-    )
-
-    const estudios = epSnap.docs.map((epDoc) => {
-      const epData = epDoc.data()
-      const estudio = estudiosMap.get(epData.estudioId) ?? { nombre: '', abreviatura: '?' }
-      const estatus = estatusMap.get(epData.estatusEstudioId) ?? { color: '#666', abreviatura: '' }
-      estudiosUnicosSet.add(estudio.abreviatura)
-      return {
-        id: epDoc.id,
-        estudioId: epData.estudioId as string,
-        abreviatura: estudio.abreviatura,
-        estatusColor: estatus.color,
-        estatusAbrev: estatus.abreviatura,
-      }
-    })
-
-    filas.push({
-      seguimientoId: segDoc.id,
-      pacienteNombre,
-      turno: turno++,
-      estudios,
-    })
-  }
-
-  return { filas, estudiosUnicos: Array.from(estudiosUnicosSet).sort() }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENTE PRINCIPAL — ListaDiaPage
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 function ListaDiaPage() {
-  const [fecha, setFecha] = useState(() => formatDateMX(nowMX()))
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['lista-dia', fecha],
-    queryFn: () => fetchListaDia(fecha),
-  })
+  const hoy = formatDateMX(nowMX())
+  const [fecha, setFecha] = useState(() => hoy)
+  const [pacientes, setPacientes] = useState<PacienteListaDia[]>(_PACIENTES_HARDCODED)
+  const [modalPaciente, setModalPaciente] = useState<PacienteListaDia | null>(null)
 
-  const filas = data?.filas ?? []
-  const estudiosUnicos = data?.estudiosUnicos ?? []
+  // Cargar datos según fecha (hardcoded solo para hoy)
+  const handleActualizar = useCallback(() => {
+    if (fecha === hoy) {
+      setPacientes(_PACIENTES_HARDCODED)
+    } else {
+      setPacientes([])
+    }
+  }, [fecha, hoy])
+
+  // Auto-actualizar al cambiar fecha
+  const handleFechaChange = useCallback((newFecha: string) => {
+    setFecha(newFecha)
+    if (newFecha === hoy) {
+      setPacientes(_PACIENTES_HARDCODED)
+    } else {
+      setPacientes([])
+    }
+  }, [hoy])
+
+  // Cambio de desayuno (optimistic)
+  const handleDesayunoChange = useCallback((seguimientoId: string, value: 0 | 1 | 2) => {
+    setPacientes((prev) =>
+      prev.map((p) => (p.seguimientoId === seguimientoId ? { ...p, desayuno: value } : p)),
+    )
+  }, [])
+
+  // Cambio de estatus de estudio (optimistic)
+  const handleEstudioChange = useCallback((seguimientoId: string, estudioId: number, estatusId: number) => {
+    setPacientes((prev) =>
+      prev.map((p) =>
+        p.seguimientoId === seguimientoId
+          ? { ...p, estudios: { ...p.estudios, [estudioId]: estatusId } }
+          : p,
+      ),
+    )
+  }, [])
 
   return (
     <div className="text-[0.8rem]">
-      <h1 className="page-title">Lista del Día</h1>
+      <h1 className="page-title">Lista de Pacientes</h1>
 
-      <div className="sticky top-0 z-20 flex items-center gap-1.5 flex-wrap p-1.5 px-2.5 mb-1.5 bg-[var(--color-fondo-card)] border border-[var(--color-borde)] rounded-[var(--radius-default)] shadow-[0_2px_8px_rgba(10,31,92,0.06)]">
-        <span className="text-[var(--color-texto-suave)] font-medium text-[0.8rem]">Fecha:</span>
-        <Input
+      {/* Toolbar */}
+      <div
+        className="sticky top-0 z-20"
+        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', marginBottom: '12px', backgroundColor: 'var(--color-fondo-card)', border: '1px solid var(--color-borde)', borderRadius: '8px', boxShadow: '0 2px 8px rgba(10,31,92,0.06)' }}
+      >
+        <span style={{ fontWeight: 500, color: 'var(--color-texto-suave)', fontSize: '0.875rem', flexShrink: 0 }}>Fecha:</span>
+        <input
           type="date"
           value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
-          className="w-auto min-h-[32px] h-8 text-[0.85rem] px-2"
+          onChange={(e) => handleFechaChange(e.target.value)}
+          style={{ width: '160px', minHeight: '38px', height: '38px', fontSize: '0.875rem', padding: '0 10px', border: '1px solid var(--color-borde)', borderRadius: '8px', backgroundColor: 'var(--color-fondo-card)', color: 'var(--color-texto)', flexShrink: 0 }}
         />
-        <Button size="sm" onClick={() => refetch()} disabled={isLoading}>
-          {isLoading ? <LoadingSpinner size="sm" className="border-white/35 border-t-white" /> : null}
-          Actualizar
-        </Button>
-        {data && (
-          <span className="bg-[rgba(25,118,210,0.1)] text-[var(--color-info)] rounded-full px-2.5 py-0.5 text-[0.75rem] font-semibold">
-            {filas.length} pacientes
-          </span>
-        )}
+        <button
+          onClick={handleActualizar}
+          style={{ flexShrink: 0, minHeight: '38px', padding: '0 16px', fontWeight: 600, fontSize: '0.875rem', color: '#ffffff', backgroundColor: '#0b2340', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
+        >
+          ↻ Actualizar
+        </button>
+        <span style={{ color: '#1976D2', fontSize: '0.8125rem', fontWeight: 600, flexShrink: 0, backgroundColor: 'rgba(25,118,210,0.1)', borderRadius: '20px', padding: '4px 12px' }}>
+          {pacientes.length} pacientes
+        </span>
       </div>
 
-      {error && (
-        <AlertBanner variant="error" className="mb-2">Error al cargar lista del día.</AlertBanner>
-      )}
+      {/* Leyenda de colores */}
+      <div
+        style={{ backgroundColor: 'var(--color-fondo-card)', border: '1px solid var(--color-borde)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}
+      >
+        <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-texto)' }}>Código de Colores</span>
+        <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '10px', alignItems: 'center', overflowX: 'auto', paddingBottom: '4px' }}>
+          {LEYENDA.map((item) => (
+            <div key={item.nombre} style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+              <span style={{ width: '14px', height: '14px', borderRadius: '3px', flexShrink: 0, backgroundColor: item.color }} />
+              <span style={{ fontSize: '0.75rem', color: 'var(--color-texto-suave)', whiteSpace: 'nowrap' }}>{item.nombre}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-8"><LoadingSpinner size="md" /></div>
-      ) : filas.length === 0 ? (
-        <div className="bg-[var(--color-fondo-card)] rounded-[var(--radius-default)] shadow-[var(--shadow-card)] p-8 text-center text-[var(--color-texto-suave)] text-sm">
+      {/* Tabla */}
+      {pacientes.length === 0 ? (
+        <div className="bg-[var(--color-fondo-card)] rounded-[var(--radius-default)] shadow-[var(--shadow-card)] p-10 text-center text-[var(--color-texto-suave)] text-sm">
           No hay pacientes para esta fecha.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-default)] shadow-[var(--shadow-card)] border border-[var(--color-borde)]">
-          <table className="w-full border-collapse bg-[var(--color-fondo-card)] min-w-[900px]">
+        <div style={{ borderRadius: '10px', overflow: 'hidden' }}>
+          <table className="border-collapse w-full bg-[var(--color-fondo-card)] table-fixed">
             <thead className="bg-[var(--color-primario)] sticky top-0 z-10">
               <tr>
-                <th className="px-1 py-0.5 text-[0.65rem] font-semibold text-white border-b-2 border-b-white/12 border-r border-r-white/8 w-9 min-w-9">
-                  #
+                {/* Turno — sticky */}
+                <th className="sticky left-0 z-[11] bg-[var(--color-primario)] py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[40px]" style={{ paddingLeft: '1px', borderTopLeftRadius: '10px' }}>
+                  Turno
                 </th>
-                <th className="px-2 py-0.5 text-[0.65rem] font-semibold text-white border-b-2 border-b-white/12 border-r border-r-white/8 text-left min-w-[140px]">
-                  Paciente
+                {/* Nombre — sticky */}
+                <th className="sticky left-[20px] z-[11] bg-[var(--color-primario)] py-4 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[160px]" style={{ paddingLeft: '10px' }}>
+                  Nombre del Paciente
                 </th>
-                {estudiosUnicos.map((abrev) => (
+                {/* Desayuno */}
+                <th className="px-0 py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[55px]">
+                  Desayuno
+                </th>
+                {/* Columnas de estudios */}
+                {ESTUDIOS_COLUMNAS.map((est) => (
                   <th
-                    key={abrev}
-                    className="border-b-2 border-b-white/12 border-r border-r-white/8 w-[30px] min-w-[30px] max-w-[30px] text-center align-middle"
+                    key={est.id}
+                    className="px-0 py-4 text-center font-semibold text-white border-b-2 border-b-white/12 align-middle w-[32px]"
+                    title={est.nombre}
                   >
-                    <div className="flex flex-col items-center justify-center min-h-[48px]">
-                      <span className="inline-block whitespace-nowrap text-[0.575rem] font-bold tracking-wide text-white -rotate-45 origin-center leading-none max-w-9 overflow-hidden">
-                        {abrev}
+                    <div className="flex flex-col items-center justify-center h-[46px]">
+                      <span className="inline-block whitespace-nowrap text-[0.65rem] font-bold tracking-wide -rotate-45 origin-center leading-none">
+                        {est.abrev}
                       </span>
                     </div>
                   </th>
                 ))}
+                {/* Obs */}
+                <th className="px-0 py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[36px]">
+                  Obs
+                </th>
+                {/* Médico Internista */}
+                <th className="px-0 py-4 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[80px]">
+                  Médico Internista
+                </th>
+                {/* Vínculos */}
+                <th className="px-0 py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[60px]" style={{ borderTopRightRadius: '10px' }}>
+                  Vínculos
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filas.map((fila, idx) => (
-                <tr
-                  key={fila.seguimientoId}
-                  className={idx % 2 === 0 ? 'bg-[var(--color-fondo)]' : 'bg-[var(--color-fondo-card)]'}
-                >
-                  <td className="px-1 py-0 border-b border-b-[var(--color-borde)] border-r border-r-[var(--color-borde)] text-center">
-                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[rgba(10,31,92,0.08)] text-[var(--color-primario)] font-bold text-[0.9rem]">
-                      {fila.turno}
-                    </span>
-                  </td>
-                  <td className="px-1 py-0 border-b border-b-[var(--color-borde)] border-r border-r-[var(--color-borde)] text-left text-[0.75rem] whitespace-nowrap cursor-pointer hover:underline hover:text-[var(--color-info)]">
-                    {fila.pacienteNombre}
-                  </td>
-                  {estudiosUnicos.map((abrev) => {
-                    const estudio = fila.estudios.find((e) => e.abreviatura === abrev)
-                    return (
-                      <td
-                        key={abrev}
-                        className="px-0.5 py-0.5 border-b border-b-[var(--color-borde)] border-r border-r-[var(--color-borde)] w-7 min-w-7 max-w-7 h-7 text-center align-middle"
-                      >
-                        {estudio ? (
-                          <div
-                            className={cn(
-                              'flex items-center justify-center w-[26px] h-[26px] rounded text-[0.6rem] font-bold text-white mx-auto',
-                            )}
-                            style={{ backgroundColor: estudio.estatusColor }}
-                          >
-                            {estudio.estatusAbrev}
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center w-[26px] h-[26px] rounded border-2 border-[rgba(15,23,42,0.08)] mx-auto" />
+              {pacientes.map((pac, idx) => {
+                const completo = pac.estatusValpac === 2
+                const listoParaSalir = pac.estatusValpac === 1
+                const tienePadecimiento = pac.padecimientoId > 0
+                const rowBgBase = idx % 2 === 0 ? 'var(--color-fondo)' : 'var(--color-fondo-card)'
+
+                // Color de celda Turno
+                const turnoBg = completo
+                  ? 'rgba(0, 130, 180, 0.30)'
+                  : tienePadecimiento
+                    ? 'rgba(245, 180, 50, 0.30)'
+                    : rowBgBase
+
+                // Color de celda Nombre
+                const nombreBg = (completo || listoParaSalir)
+                  ? 'rgba(0, 166, 81, 0.28)'
+                  : tienePadecimiento
+                    ? 'rgba(245, 180, 50, 0.30)'
+                    : rowBgBase
+
+                return (
+                  <tr key={pac.seguimientoId} style={{ backgroundColor: rowBgBase }}>
+                    {/* Turno — sticky */}
+                    <td
+                      className="sticky left-0 z-[9] px-0 py-[14px] text-center border-b border-b-[var(--color-borde)]"
+                      style={{ backgroundColor: turnoBg }}
+                    >
+                      <span className="inline-flex items-center justify-center w-[18px] h-[18px] rounded-full bg-[rgba(10,31,92,0.08)] text-[var(--color-primario)] font-bold text-[0.7rem]">
+                        {pac.turno}
+                      </span>
+                    </td>
+                    {/* Nombre — sticky */}
+                    <td
+                      className="sticky left-[40px] z-[9] py-[14px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden"
+                      style={{ backgroundColor: nombreBg, paddingLeft: '5px' }}
+                    >
+                      <div className="flex items-center gap-0.5">
+                        <span className={`font-medium ${tienePadecimiento && !completo ? 'text-[#F57C00]' : 'text-[var(--color-texto)]'}`}>
+                          {pac.nombre}
+                        </span>
+                        {tienePadecimiento && !completo && (
+                          <svg className="w-2.5 h-2.5 shrink-0 text-[#F57C00]" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                          </svg>
                         )}
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
+                      </div>
+                    </td>
+                    {/* Desayuno — pill badge */}
+                    <td className="px-0 py-[14px] text-center border-b border-b-[var(--color-borde)] align-middle">
+                      <div className="relative inline-flex items-center justify-center">
+                        <select
+                          value={pac.desayuno}
+                          onChange={(e) => handleDesayunoChange(pac.seguimientoId, Number(e.target.value) as 0 | 1 | 2)}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-[1]"
+                          aria-label="Desayuno"
+                        >
+                          {DESAYUNO_OPCIONES.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                        <span
+                          className="select-none pointer-events-none"
+                          style={{
+                            backgroundColor: DESAYUNO_OPCIONES.find((d) => d.value === pac.desayuno)?.color ?? '#666',
+                            color: pac.desayuno === 1 ? '#1a1a1a' : '#ffffff',
+                            fontSize: '0.6rem',
+                            fontWeight: 700,
+                            width: '57px',
+                            height: '28px',
+                            borderRadius: '4px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {DESAYUNO_OPCIONES.find((d) => d.value === pac.desayuno)?.label ?? '—'}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Celdas de estudios — cuadros sólidos con letra */}
+                    {ESTUDIOS_COLUMNAS.map((est) => {
+                      const estatusId = pac.estudios[est.id] ?? 0
+                      const estatus = ESTATUS_ESTUDIO.find((e) => e.id === estatusId) ?? ESTATUS_ESTUDIO[0]
+                      return (
+                        <td
+                          key={est.id}
+                          style={{ padding: '2px', textAlign: 'center', borderBottom: '1px solid var(--color-borde)', verticalAlign: 'middle' }}
+                        >
+                          <div className="relative" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', margin: '0 auto' }}>
+                            <select
+                              value={estatusId}
+                              onChange={(e) => handleEstudioChange(pac.seguimientoId, est.id, Number(e.target.value))}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-[1]"
+                              title={`${est.nombre}: ${estatus.nombre}`}
+                              aria-label={`${est.nombre}: ${estatus.nombre}`}
+                            >
+                              {ESTATUS_ESTUDIO.map((s) => (
+                                <option key={s.id} value={s.id}>{s.nombre}</option>
+                              ))}
+                            </select>
+                            <span
+                              className="flex items-center justify-center w-[28px] h-[28px] text-[0.6rem] font-bold select-none pointer-events-none"
+                              style={{
+                                backgroundColor: estatus.esBorde ? 'transparent' : estatus.color,
+                                border: estatus.esBorde ? '1.5px solid #d1d5db' : 'none',
+                                borderRadius: '4px',
+                                color: estatus.esBorde ? 'transparent' : '#ffffff',
+                              }}
+                            >
+                              {estatus.letra}
+                            </span>
+                          </div>
+                        </td>
+                      )
+                    })}
+
+                    {/* Obs — botón ojo → modal */}
+                    <td style={{ padding: '7px 2px', borderBottom: '1px solid var(--color-borde)', textAlign: 'center', verticalAlign: 'middle', overflow: 'visible' }}>
+                      <button
+                        onClick={() => setModalPaciente(pac)}
+                        className={pac.tieneAdicionales ? 'animate-[obsPulse_2s_ease-in-out_1]' : ''}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '24px', minHeight: '24px', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+                        title={pac.tieneAdicionales ? 'Estudios adicionales — ver datos' : 'Ver datos del paciente'}
+                        aria-label={`Ver datos de ${pac.nombre}`}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke={pac.tieneAdicionales ? '#FF8C00' : '#0b2340'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <circle cx="12" cy="12" r="3" stroke={pac.tieneAdicionales ? '#FF8C00' : '#0b2340'} strokeWidth="1.5" />
+                        </svg>
+                      </button>
+                    </td>
+
+                    {/* Médico Internista */}
+                    <td className="px-0.5 py-[14px] border-b border-b-[var(--color-borde)] whitespace-normal break-words text-[0.7rem] leading-tight overflow-hidden">
+                      {pac.medicoInternista ?? <span className="text-[var(--color-texto-suave)] text-[0.7rem]">SIN ASIGNAR</span>}
+                    </td>
+
+                    {/* Vínculos */}
+                    <td style={{ padding: '7px 2px', borderBottom: '1px solid var(--color-borde)', textAlign: 'center', verticalAlign: 'middle', overflow: 'visible' }}>
+                      <a
+                        href={`#/paciente/${pac.seguimientoId}`}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '24px', minHeight: '24px' }}
+                        title={`Detalle seguimiento #${pac.seguimientoId}`}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="#0b2340" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="#0b2340" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </a>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Modal Datos del Paciente */}
+      {modalPaciente && (
+        <ModalDatosPaciente paciente={modalPaciente} onClose={() => setModalPaciente(null)} />
       )}
     </div>
   )

@@ -127,39 +127,50 @@ export function AppShell() {
 
       {/* Main content */}
       <main
-        className="flex-1 flex flex-col bg-[var(--color-fondo)] p-4 md:py-6 md:px-10 transition-[margin-left] duration-[250ms] ease-in-out"
+        className="flex-1 flex flex-col bg-[var(--color-fondo)] transition-[margin-left] duration-[250ms] ease-in-out"
         style={{
           minHeight: '100dvh',
           marginLeft: sidebarOpen ? 200 : 0,
         }}
       >
-        {/* Hamburger toggle */}
+        {/* Hamburger toggle — fixed */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="fixed top-2 z-[201] flex items-center justify-center"
           style={{
-            left: sidebarOpen ? 156 : 8,
-            width: 44,
-            height: 44,
+            position: 'fixed',
+            top: 8,
+            left: sidebarOpen ? 164 : 8,
+            zIndex: 201,
+            width: 36,
+            height: 36,
+            minHeight: 36,
+            maxHeight: 36,
+            minWidth: 36,
+            maxWidth: 36,
+            padding: 0,
             backgroundColor: 'var(--color-primario)',
             color: '#fff',
             border: 'none',
-            borderRadius: 'var(--radius-default)',
+            borderRadius: '6px',
             touchAction: 'manipulation',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
             transition: 'left 0.25s ease',
-            boxShadow: '0 2px 8px rgba(10,31,92,0.25)',
+            boxShadow: 'none',
           }}
           aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
           aria-expanded={sidebarOpen}
         >
           {sidebarOpen ? (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
               <line x1="4" y1="6" x2="20" y2="6" />
               <line x1="4" y1="12" x2="20" y2="12" />
@@ -168,7 +179,7 @@ export function AppShell() {
           )}
         </button>
 
-        <div className="flex-1" style={{ paddingTop: 64, paddingLeft: 24, paddingRight: 24, paddingBottom: 24 }}>
+        <div className="flex-1" style={{ padding: sidebarOpen ? '12px 24px 24px 24px' : '12px 24px 24px 50px' }}>
           <Outlet />
         </div>
 
