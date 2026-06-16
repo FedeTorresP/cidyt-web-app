@@ -1,6 +1,6 @@
 {
   "name": "cidyt-web-app",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "private": true,
   "type": "module",
   "description": "IPadCIDyT v4 — Plataforma Core de Diagnóstico y Consulta Médica (Vite + TanStack + Firebase)",

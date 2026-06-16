@@ -5,6 +5,25 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.1.1] — 2026-06-16
+
+### Seguimiento de Paciente, Modal Obs mejorado, Estado compartido
+
+#### Agregado
+- **Página "Seguimiento del Paciente"** (`/paciente/$seguimientoId`): formulario completo con 4 cards (Estado General, Médico y Antropometría, Resultados, Est. Adicionales) y tabla "Estudios del Paquete" con 20 filas fijas
+- **Hook compartido `use-lista-dia`**: migración de estado local a TanStack Query cache para sincronización bidireccional entre lista-dia, seguimiento y modal Obs
+- **Función `useUpdatePacienteCache`**: actualización optimista del cache compartido desde cualquier página
+- **Toast nativo** en página de seguimiento (sin dependencia externa) para feedback de guardado
+
+#### Modificado
+- **Modal "Datos del Paciente" (Obs)**: rediseño con más espaciado (20px entre filas), contenedores tipo input disabled (`#f3f4f6`, border, border-radius: 6px), labels arriba del valor, grid por filas con proporciones definidas, badges circulares para Desayuno y pill para Tarjeta
+- **Columna Vínculos** en lista-dia: migrada de `<a href="#/...">` a `<Link>` de TanStack Router con tipado de params
+- **Dropdown "Paciente listo para salir"**: eliminada opción "Cancelado" (solo No, Si, Paciente Terminó su visita)
+- **Tabla "Estudios del Paquete"** en seguimiento: muestra siempre los 20 estudios fijos con dropdown de médico filtrado por especialidad y fallback a todos
+- **Desayuno y Estatus Valpac**: cambios en seguimiento se reflejan inmediatamente en lista-dia (cache compartido)
+
+---
+
 ## [3.1.0] — 2026-06-15 [`f1ffc35`...`55d3702`](https://github.com/Medica-Sur-TI/cidyt-web-app/compare/f1ffc35...55d3702)
 
 ### Mi Perfil y Accesos, SAP Integration ADC, Timezone Utility

@@ -1,7 +1,9 @@
-import { createLazyFileRoute } from '@tanstack/react-router'
+import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { nowMX, formatDateMX } from '@/lib/timezone'
+import { useListaDia, useUpdatePacienteCache } from '@/hooks/use-lista-dia'
+import type { PacienteListaDia } from '@/hooks/use-lista-dia'
 
 export const Route = createLazyFileRoute('/_authenticated/lista-dia')({
   component: ListaDiaPage,
@@ -68,49 +70,6 @@ const LEYENDA = [
 ] as const
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DATOS HARDCODEADOS — 15 pacientes (NO se despliegan hasta indicación)
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-interface PacienteListaDia {
-  seguimientoId: string
-  turno: number
-  nombre: string
-  desayuno: 0 | 1 | 2
-  estatusValpac: 0 | 1 | 2
-  padecimientoId: number
-  medicoInternista: string | null
-  paqueteId: string
-  paqueteNombre: string
-  edad: number
-  peso: number
-  talla: number
-  fechaEntrega: string | null
-  horaEntrega: string | null
-  tarjetaEntRes: 0 | 1 | 2
-  tieneAdicionales: boolean
-  estudios: Record<number, number> // estudioId → estatusId
-}
-
-const _PACIENTES_HARDCODED: PacienteListaDia[] = [
-  // Para activar: cambiar inicialización de `pacientes` state a `_PACIENTES_HARDCODED`.
-  { seguimientoId: '73605', turno: 1, nombre: 'ALFREDO CANO JAUREGUI SEGURA MILLAN', desayuno: 0, estatusValpac: 2, padecimientoId: 0, medicoInternista: 'NEGREROS BALVANERA FABIOLA', paqueteId: 'DT0066', paqueteNombre: 'CHECK UP EMPRESA D', edad: 41, peso: 0, talla: 0, fechaEntrega: 'Tue Dec 31', horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: true, estudios: { 1: 4, 2: 4, 3: 2, 4: 1, 5: 1, 6: 1, 7: 4, 8: 1, 9: 6, 19: 6, 10: 1, 11: 1, 12: 1, 13: 6, 14: 1, 15: 4, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73607', turno: 2, nombre: 'SIXTA GUTIERREZ RIVERA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 50, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73608', turno: 3, nombre: 'ASAHI TOSHIYA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0040', paqueteNombre: 'CHECK UP EMPRESA C', edad: 45, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2, 7: 1, 8: 1, 9: 2, 19: 2, 10: 2, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73609', turno: 4, nombre: 'VERONICA ADRIANA BAÑUELOS SANCHEZ', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 38, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2, 7: 1, 8: 2, 9: 1, 19: 2, 10: 1, 11: 4, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73610', turno: 5, nombre: 'MARIO DE MARCHIS PARESCHI', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 55, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73611', turno: 6, nombre: 'MARIA GUADALUPE RUIZ DEL RIO', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 42, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73612', turno: 7, nombre: 'SABINA GARCIA ORTEGA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0066', paqueteNombre: 'CHECK UP EMPRESA D', edad: 48, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 4, 2: 2, 3: 2, 4: 2, 5: 2, 6: 1, 7: 1, 8: 2, 9: 1, 19: 2, 10: 1, 11: 5, 12: 5, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73613', turno: 8, nombre: 'JESUS AUGUSTO CARMONA COLINA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 60, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73614', turno: 9, nombre: 'JAIME VELAZQUEZ BERUMEN', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 37, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 6, 10: 1, 11: 1, 12: 1, 13: 6, 14: 1, 15: 6, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73615', turno: 10, nombre: 'HEIDI PRAGER GUZMAN', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0040', paqueteNombre: 'CHECK UP EMPRESA C', edad: 44, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 4, 2: 2, 3: 2, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 6, 12: 6, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73616', turno: 11, nombre: 'MARIO ALFREDO DONIZ ISLAS', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 52, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 4, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 4, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73617', turno: 12, nombre: 'JOSE LUIS RAMIREZ PALOMARES', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 47, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73618', turno: 13, nombre: 'RICARDO EDDY MONTERRUBIO MORENO', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 35, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73619', turno: 14, nombre: 'MONICA ALVAREZ RIOS', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 39, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-  { seguimientoId: '73620', turno: 15, nombre: 'MARIO LUIS PRADO BABAYAN', desayuno: 0, estatusValpac: 0, padecimientoId: 1, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 58, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: { 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
-]
-
-/* ═══════════════════════════════════════════════════════════════════════════
    COMPONENTE — Modal Datos del Paciente
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -125,18 +84,39 @@ function ModalDatosPaciente({
   const tarjetaLabel = paciente.tarjetaEntRes === 0 ? 'No' : paciente.tarjetaEntRes === 1 ? 'Sí' : 'Enviado'
   const tarjetaColor = paciente.tarjetaEntRes === 0 ? '#D32F2F' : '#00A651'
 
+  /** Estilo reutilizable para labels encima del valor */
+  const labelStyle: React.CSSProperties = {
+    fontSize: '0.75rem',
+    color: 'var(--color-texto-suave)',
+    display: 'block',
+    marginBottom: '4px',
+  }
+
+  /** Estilo reutilizable para los contenedores de valor (simula input disabled) */
+  const valorStyle: React.CSSProperties = {
+    background: '#f3f4f6',
+    border: '1px solid #e5e7eb',
+    borderRadius: '6px',
+    padding: '8px 12px',
+    fontSize: '0.85rem',
+    fontWeight: 500,
+    color: 'var(--color-texto)',
+    display: 'block',
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={onClose}
     >
       <div
-        className="bg-[var(--color-fondo-card)] rounded-lg shadow-xl w-[90vw] max-w-[540px] max-h-[85vh] overflow-y-auto p-6 relative"
+        className="bg-[var(--color-fondo-card)] rounded-xl shadow-xl w-[90vw] max-w-[580px] max-h-[85vh] overflow-y-auto relative"
+        style={{ padding: '24px' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <h2 className="text-sm font-semibold text-[var(--color-texto-suave)]">Datos del Paciente</h2>
+        <div className="flex items-start justify-between" style={{ marginBottom: '8px' }}>
+          <h2 className="text-[0.9rem] font-semibold text-[var(--color-texto)]">Datos del Paciente</h2>
           <button
             onClick={onClose}
             className="text-[var(--color-texto-suave)] hover:text-[var(--color-texto)] text-xl leading-none p-1"
@@ -146,92 +126,90 @@ function ModalDatosPaciente({
           </button>
         </div>
 
-        <h3 className="text-lg font-bold text-[var(--color-texto)] mb-4">{paciente.nombre}</h3>
+        <h3 className="text-[1.15rem] font-bold text-[var(--color-texto)]" style={{ marginBottom: '20px' }}>{paciente.nombre}</h3>
 
-        {/* Row 1: Paquete + Desayuno */}
-        <div className="grid grid-cols-[1fr_1.5fr_auto] gap-3 mb-3">
+        {/* Fila 1: ID Paquete (20%) | Paquete (60%) | Desayuno (20%) */}
+        <div style={{ display: 'grid', gridTemplateColumns: '20% 1fr 20%', gap: '12px', marginBottom: '20px' }}>
           <div>
-            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">ID Paquete</span>
-            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.paqueteId}</span>
+            <span style={labelStyle}>ID Paquete</span>
+            <span style={valorStyle}>{paciente.paqueteId}</span>
           </div>
           <div>
-            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Paquete</span>
-            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.paqueteNombre}</span>
+            <span style={labelStyle}>Paquete</span>
+            <span style={valorStyle}>{paciente.paqueteNombre}</span>
           </div>
           <div>
-            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Desayuno</span>
+            <span style={labelStyle}>Desayuno</span>
             <span
-              className="text-[0.75rem] font-bold text-white rounded px-2 py-1 block text-center"
-              style={{ backgroundColor: desayunoOpt?.color ?? '#666' }}
+              style={{ backgroundColor: desayunoOpt?.color ?? '#666', width: '32px', height: '32px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, color: '#ffffff' }}
             >
-              {desayunoOpt?.label ?? '—'}
+              {desayunoOpt?.label === 'Sí' ? 'Sí' : desayunoOpt?.label === 'No' ? '✕' : '…'}
             </span>
           </div>
         </div>
 
-        {/* Médico Internista */}
-        <div className="mb-3">
-          <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Médico Internista</span>
-          <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">
+        {/* Fila 2: Médico Internista (100%) */}
+        <div style={{ marginBottom: '20px' }}>
+          <span style={labelStyle}>Médico Internista</span>
+          <span style={valorStyle}>
             {paciente.medicoInternista ?? '—'}
           </span>
         </div>
 
-        {/* Row 2: Edad, Peso, Talla */}
-        <div className="grid grid-cols-3 gap-3 mb-3">
+        {/* Fila 3: Edad (33%) | Peso (33%) | Talla (33%) */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
           <div>
-            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Edad</span>
-            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.edad}</span>
+            <span style={labelStyle}>Edad</span>
+            <span style={valorStyle}>{paciente.edad}</span>
           </div>
           <div>
-            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Peso</span>
-            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.peso.toFixed(2)} Kg</span>
+            <span style={labelStyle}>Peso</span>
+            <span style={valorStyle}>{paciente.peso.toFixed(2)} Kg</span>
           </div>
           <div>
-            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Talla</span>
-            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.talla.toFixed(2)} cm</span>
+            <span style={labelStyle}>Talla</span>
+            <span style={valorStyle}>{paciente.talla.toFixed(2)} cm</span>
           </div>
         </div>
 
-        {/* Padecimientos */}
-        <div className="mb-3">
-          <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Padecimientos</span>
-          <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">
+        {/* Fila 4: Padecimientos (100%) */}
+        <div style={{ marginBottom: '20px' }}>
+          <span style={labelStyle}>Padecimientos</span>
+          <span style={{ ...valorStyle, display: 'inline-block', borderRadius: '20px' }}>
             {paciente.padecimientoId > 0 ? `Padecimiento #${paciente.padecimientoId}` : 'Ninguno'}
           </span>
         </div>
 
-        {/* Row 3: Fecha Entrega, Hora, Tarjeta */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        {/* Fila 5: Fecha Entrega (33%) | Hora Entrega (33%) | Tarjeta (33%) */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
           <div>
-            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Fecha Entrega</span>
-            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.fechaEntrega ?? '—'}</span>
+            <span style={labelStyle}>Fecha Entrega</span>
+            <span style={{ ...valorStyle, textAlign: 'center', borderRadius: '20px' }}>{paciente.fechaEntrega ?? '—'}</span>
           </div>
           <div>
-            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Hora Entrega</span>
-            <span className="text-[0.8rem] font-medium bg-[var(--color-fondo)] rounded px-2 py-1 block">{paciente.horaEntrega ?? '—'}</span>
+            <span style={labelStyle}>Hora Entrega</span>
+            <span style={{ ...valorStyle, textAlign: 'center', borderRadius: '20px' }}>{paciente.horaEntrega ?? '—'}</span>
           </div>
           <div>
-            <span className="text-[0.7rem] text-[var(--color-texto-suave)] block mb-0.5">Tarjeta Entrega de Resultados</span>
+            <span style={labelStyle}>Tarjeta Entrega de Resultados</span>
             <span
-              className="text-[0.75rem] font-bold text-white rounded px-2 py-1 block text-center"
-              style={{ backgroundColor: tarjetaColor }}
+              style={{ backgroundColor: tarjetaColor, borderRadius: '9999px', padding: '4px 12px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, color: '#ffffff' }}
             >
               {tarjetaLabel}
             </span>
           </div>
         </div>
 
-        {/* Estudios Adicionales */}
-        <div className="border-t border-[var(--color-borde)] pt-3 mb-4">
-          <h4 className="text-sm font-semibold text-[var(--color-texto)] mb-2">Estudios Adicionales</h4>
-          <p className="text-[0.8rem] text-[var(--color-texto-suave)] bg-[var(--color-fondo)] rounded px-2 py-2">
+        {/* Fila 6: Estudios Adicionales (100%) */}
+        <div style={{ marginBottom: '20px' }}>
+          <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-texto)', marginBottom: '8px' }}>Estudios Adicionales</h4>
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-texto-suave)', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '12px', textAlign: 'center' }}>
             No se encontró ningún resultado
           </p>
         </div>
 
         {/* Botón cerrar */}
-        <div className="flex justify-end">
+        <div style={{ borderTop: '1px solid var(--color-borde)', paddingTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
           <Button size="sm" onClick={onClose}>Cerrar</Button>
         </div>
       </div>
@@ -246,45 +224,32 @@ function ModalDatosPaciente({
 function ListaDiaPage() {
   const hoy = formatDateMX(nowMX())
   const [fecha, setFecha] = useState(() => hoy)
-  const [pacientes, setPacientes] = useState<PacienteListaDia[]>(_PACIENTES_HARDCODED)
+  const { data: pacientes = [], refetch } = useListaDia(fecha)
+  const updateCache = useUpdatePacienteCache()
   const [modalPaciente, setModalPaciente] = useState<PacienteListaDia | null>(null)
 
-  // Cargar datos según fecha (hardcoded solo para hoy)
+  // Actualizar manualmente
   const handleActualizar = useCallback(() => {
-    if (fecha === hoy) {
-      setPacientes(_PACIENTES_HARDCODED)
-    } else {
-      setPacientes([])
-    }
-  }, [fecha, hoy])
+    refetch()
+  }, [refetch])
 
   // Auto-actualizar al cambiar fecha
   const handleFechaChange = useCallback((newFecha: string) => {
     setFecha(newFecha)
-    if (newFecha === hoy) {
-      setPacientes(_PACIENTES_HARDCODED)
-    } else {
-      setPacientes([])
-    }
-  }, [hoy])
+  }, [])
 
-  // Cambio de desayuno (optimistic)
+  // Cambio de desayuno (optimistic via cache)
   const handleDesayunoChange = useCallback((seguimientoId: string, value: 0 | 1 | 2) => {
-    setPacientes((prev) =>
-      prev.map((p) => (p.seguimientoId === seguimientoId ? { ...p, desayuno: value } : p)),
-    )
-  }, [])
+    updateCache(fecha, seguimientoId, { desayuno: value })
+  }, [fecha, updateCache])
 
-  // Cambio de estatus de estudio (optimistic)
+  // Cambio de estatus de estudio (optimistic via cache)
   const handleEstudioChange = useCallback((seguimientoId: string, estudioId: number, estatusId: number) => {
-    setPacientes((prev) =>
-      prev.map((p) =>
-        p.seguimientoId === seguimientoId
-          ? { ...p, estudios: { ...p.estudios, [estudioId]: estatusId } }
-          : p,
-      ),
-    )
-  }, [])
+    const pac = pacientes.find((p) => p.seguimientoId === seguimientoId)
+    if (pac) {
+      updateCache(fecha, seguimientoId, { estudios: { ...pac.estudios, [estudioId]: estatusId } })
+    }
+  }, [fecha, updateCache, pacientes])
 
   return (
     <div className="text-[0.8rem]">
@@ -521,8 +486,9 @@ function ListaDiaPage() {
 
                     {/* Vínculos */}
                     <td style={{ padding: '7px 2px', borderBottom: '1px solid var(--color-borde)', textAlign: 'center', verticalAlign: 'middle', overflow: 'visible' }}>
-                      <a
-                        href={`#/paciente/${pac.seguimientoId}`}
+                      <Link
+                        to="/paciente/$seguimientoId"
+                        params={{ seguimientoId: pac.seguimientoId }}
                         style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '24px', minHeight: '24px' }}
                         title={`Detalle seguimiento #${pac.seguimientoId}`}
                       >
@@ -530,7 +496,7 @@ function ListaDiaPage() {
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="#0b2340" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="#0b2340" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                      </a>
+                      </Link>
                     </td>
                   </tr>
                 )
