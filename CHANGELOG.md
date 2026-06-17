@@ -5,6 +5,29 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.2.0] — 2026-06-17
+
+### Lista de Pacientes Caja, Caja y Facturación (detalle)
+
+#### Agregado
+- **Página "Lista de Pacientes Caja"** (`/lista-caja`): tabla ultra-compacta de seguimiento para el área de Caja con 20 columnas de estudios (read-only), columnas extras (Edad, Paquete, Peso, Talla, Desayuno, Tarjeta Ent. Res.) y Médico Internista como última columna
+- **Hook `use-lista-caja`**: TanStack Query con endpoint `GET /api/caja?fecha=` y fallback a mock (15 pacientes sincronizados con lista-dia)
+- **Página "Caja y Facturación"** (`/caja/$seguimientoId`): detalle de facturación accesible desde el nombre del paciente en lista-caja, con 4 secciones (Información del Paciente, Datos Factura, Estudios Adicionales, Facturas, Paciente se Retira)
+- **Hook `use-caja-detalle`**: query + 3 mutations (guardar/actualizar factura, eliminar factura soft-delete, confirmar egreso) con invalidación automática
+- **Sección "Paciente se Retira"**: implementa el ciclo de vida completo (Estado A: no listo / Estado B: enfermería marcó listo / Estado C: egresado) con control de flujo inter-área
+- **Ruta `/caja/$seguimientoId`** con lazy loading (placeholder de detalle de facturación)
+
+#### Modificado
+- **Menú de navegación (fallback)**: "Lista de Pacientes Caja" ahora apunta a `/lista-caja` en vez de `/caja`
+- **Color "No Incluido" en lista-caja**: cuadros de estudio no realizados se muestran con gris oscuro sólido (`#374151`) en vez de borde transparente — exclusivo de la vista Caja
+- **Datos mock sincronizados**: los 15 pacientes son idénticos entre `use-lista-dia` y `use-lista-caja` para consistencia cross-page
+
+#### Eliminado
+- **Página "Caja" antigua** (`/caja`): tabla de facturas con DataTable eliminada — reemplazada por `/lista-caja` + `/caja/$seguimientoId`
+- **Hook `use-facturas`**: removido (solo era usado por la página de Caja anterior)
+
+---
+
 ## [3.1.1] — 2026-06-16
 
 ### Seguimiento de Paciente, Modal Obs mejorado, Estado compartido

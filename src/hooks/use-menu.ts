@@ -19,7 +19,7 @@ import type { NavMenuItem } from '@/types/menu'
 const FALLBACK_MENU: NavMenuItem[] = [
   { id: 'fb-1', label: 'Registro de Pacientes', route: '/paciente', displayOrder: 1 },
   { id: 'fb-2', label: 'Lista de Pacientes', route: '/lista-dia', displayOrder: 2 },
-  { id: 'fb-3', label: 'Lista de Pacientes Caja', route: '/caja', displayOrder: 3 },
+  { id: 'fb-3', label: 'Lista de Pacientes Caja', route: '/lista-caja', displayOrder: 3 },
   { id: 'fb-4', label: 'Lugares', route: '/lugares', displayOrder: 4 },
   { id: 'fb-5', label: 'Registro Estudios Externos', route: '/externos', displayOrder: 5 },
   { id: 'fb-6', label: 'Reportería', route: '/reportes', displayOrder: 6 },
