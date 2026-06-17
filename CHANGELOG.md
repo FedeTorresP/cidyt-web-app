@@ -5,6 +5,23 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.2.1] — 2026-06-17
+
+### Estudios Externos + Consolidación sap-pipeline
+
+#### Agregado
+- **Página "Estudios Externos"** (`/externos`): formulario de registro con campos Fecha, Nombre del Paciente, Nombre del Estudio y Observaciones (textarea full-width). Validación frontend, banners de éxito/error con auto-dismiss, limpieza de campos (excepto fecha) tras éxito
+- **Ruta `/estudios-externos`** como alias adicional (ambas rutas renderizan el mismo formulario)
+- **Hook `use-estudios-externos`**: mutation `useRegistrarEstudioExterno()` con `POST /api/externos`, Bearer token Firebase Auth e invalidación de queryKey `['estudios-externos']`
+- **`sap-pipeline/`**: microservicio FastAPI consolidado (reemplaza `sap-integration-service`) para ingesta SAP → Firestore vía JSON
+- **`sap-pipeline/app/core/normalizer.py`**: normalización Unicode NFC integrada en los servicios de pacientes y paquetes antes de escribir a Firestore
+- **`sap-pipeline/samples/`**: XML de admisión legacy como referencia histórica
+
+#### Eliminado
+- **`sap-integration-service/`**: movido a repositorio Legacy (reemplazado por `sap-pipeline`)
+
+---
+
 ## [3.2.0] — 2026-06-17
 
 ### Registro de Pacientes, Lista de Pacientes Caja, Caja y Facturación (detalle)

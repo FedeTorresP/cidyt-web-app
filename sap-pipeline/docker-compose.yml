@@ -1,0 +1,14 @@
+services:
+  sap-pipeline:
+    build: .
+    container_name: sap-pipeline
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # Monta el service account de Firebase de solo lectura.
+      - ./serviceAccountKey.json:/srv/serviceAccountKey.json:ro
+    environment:
+      FIREBASE_CREDENTIALS_PATH: /srv/serviceAccountKey.json
