@@ -7,9 +7,15 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ## [3.2.0] — 2026-06-17
 
-### Lista de Pacientes Caja, Caja y Facturación (detalle)
+### Registro de Pacientes, Lista de Pacientes Caja, Caja y Facturación (detalle)
 
 #### Agregado
+- **Página "Registro de Pacientes"** (`/paciente`): vista completa con dos modos internos (Lista + Formulario) sin rutas separadas
+- **Vista Lista**: card con header azul oscuro, selector de fecha, tabs "Activos/Cancelados" con contadores, tabla con turno (badge circular), nombre, paquete, botones Editar (azul info) y Cancelar (rojo outline con confirmación inline)
+- **Vista Formulario**: grid 2 columnas con campos Primer Nombre, Segundo Nombre, Apellido Paterno/Materno, Fecha Nac., Género, Historia, Paquete (catálogo dinámico), Empresa (catálogo dinámico), Turno (1-99). Botón submit dinámico: verde "Registrar Paciente" / azul oscuro "Guardar Cambios"
+- **Flujo cancelar paciente**: confirmación inline (¿Confirmar? / No) sin `confirm()` nativo — soft-delete con PATCH `Activo: 0`
+- **Flujo restaurar paciente**: botón "↩ Restaurar" en tab Cancelados con PATCH `Activo: 1`
+- **Hook `use-registro-pacientes`**: queries (`usePacientesDelDia`, `useCatalogos`, `usePacienteDetalle`) + mutations (`useCrearPaciente`, `useEditarPaciente`, `useToggleActivo`) con Bearer token Firebase Auth y fallback a mock
 - **Página "Lista de Pacientes Caja"** (`/lista-caja`): tabla ultra-compacta de seguimiento para el área de Caja con 20 columnas de estudios (read-only), columnas extras (Edad, Paquete, Peso, Talla, Desayuno, Tarjeta Ent. Res.) y Médico Internista como última columna
 - **Hook `use-lista-caja`**: TanStack Query con endpoint `GET /api/caja?fecha=` y fallback a mock (15 pacientes sincronizados con lista-dia)
 - **Página "Caja y Facturación"** (`/caja/$seguimientoId`): detalle de facturación accesible desde el nombre del paciente en lista-caja, con 4 secciones (Información del Paciente, Datos Factura, Estudios Adicionales, Facturas, Paciente se Retira)
@@ -18,9 +24,10 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 - **Ruta `/caja/$seguimientoId`** con lazy loading (placeholder de detalle de facturación)
 
 #### Modificado
+- **Ruta `/paciente`**: convertida de placeholder a lazy route con componente completo `RegistroPacientesPage`
 - **Menú de navegación (fallback)**: "Lista de Pacientes Caja" ahora apunta a `/lista-caja` en vez de `/caja`
+- **Datos mock sincronizados**: los 15 pacientes son idénticos entre `use-lista-dia`, `use-lista-caja` y `use-registro-pacientes` para consistencia cross-page
 - **Color "No Incluido" en lista-caja**: cuadros de estudio no realizados se muestran con gris oscuro sólido (`#374151`) en vez de borde transparente — exclusivo de la vista Caja
-- **Datos mock sincronizados**: los 15 pacientes son idénticos entre `use-lista-dia` y `use-lista-caja` para consistencia cross-page
 
 #### Eliminado
 - **Página "Caja" antigua** (`/caja`): tabla de facturas con DataTable eliminada — reemplazada por `/lista-caja` + `/caja/$seguimientoId`
