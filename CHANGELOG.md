@@ -5,6 +5,17 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.2.2] — 2026-06-18 [`35a30e0`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/35a30e0)
+
+### Optimización de densidad vertical para iPad — Lista de Pacientes & Lista de Estudios Caja
+
+#### Modificado
+- **Lista de Pacientes** (`/lista-dia`): reducir padding vertical en toolbar (10→6px), leyenda (12→6px), headers (py-4→py-1.5), filas (py-14→py-4), cuadros de estudio (28→22px), badge desayuno (57×28→50×22). Agregar sticky thead dinámico debajo del toolbar con ResizeObserver. Redistribuir ancho Médico Internista (80→100px) / Vínculos (60→40px). Agrandar ícono padecimiento (10→16px) con margen derecho
+- **Lista de Estudios — Caja** (`/lista-caja`): misma compactación de toolbar, headers y filas. Badges de Desayuno/Tarjeta cambiados de cuadrados sólidos a texto coloreado (legacy style). Celdas de estudio sin padding (0px). Header color corregido a `var(--color-primario)`. Sticky thead dinámico debajo del toolbar
+- **`globals.css`**: `h1.page-title` margin-bottom reducido de 16px a 6px
+
+---
+
 ## [3.2.2] — 2026-06-18 [`69485b3`...`c660056`](https://github.com/Medica-Sur-TI/cidyt-web-app/compare/69485b3...c660056)
 
 ### Médico por Ubicación y Día — Página Lugares

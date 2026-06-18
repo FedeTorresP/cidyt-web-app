@@ -1,5 +1,5 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { nowMX, formatDateMX } from '@/lib/timezone'
 import { useListaCaja } from '@/hooks/use-lista-caja'
@@ -49,18 +49,18 @@ const ESTATUS_ESTUDIO = [
   { id: 8, nombre: 'Estudio Combinado', color: '#873600', letra: '', esBorde: false },
 ] as const
 
-/** Desayuno — badge read-only. */
+/** Desayuno — texto coloreado read-only. */
 const DESAYUNO_MAP = [
-  { value: 0, label: 'No', bg: '#D32F2F', textColor: '#ffffff' },
-  { value: 1, label: 'En', bg: '#facc15', textColor: '#1a1a1a' },
-  { value: 2, label: 'Sí', bg: '#00A651', textColor: '#ffffff' },
+  { value: 0, label: 'No', color: '#D32F2F' },
+  { value: 1, label: 'En', color: '#F57C00' },
+  { value: 2, label: 'Sí', color: '#00A651' },
 ] as const
 
-/** Tarjeta Entrega Resultados — badge read-only. */
-const TARJETA_MAP: Record<number, { label: string; bg: string; textColor: string }> = {
-  0: { label: 'No', bg: '#D32F2F', textColor: '#ffffff' },
-  1: { label: 'Sí', bg: '#00A651', textColor: '#ffffff' },
-  2: { label: 'Env', bg: '#1976D2', textColor: '#ffffff' },
+/** Tarjeta Entrega Resultados — texto coloreado read-only. */
+const TARJETA_MAP: Record<number, { label: string; color: string }> = {
+  0: { label: 'No', color: '#D32F2F' },
+  1: { label: 'Sí', color: '#00A651' },
+  2: { label: 'Env', color: '#1976D2' },
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -71,6 +71,20 @@ function ListaCajaPage() {
   const hoy = formatDateMX(nowMX())
   const [fecha, setFecha] = useState(() => hoy)
   const { data: pacientes = [], refetch } = useListaCaja(fecha)
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const [toolbarHeight, setToolbarHeight] = useState(0)
+
+  useEffect(() => {
+    if (toolbarRef.current) {
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setToolbarHeight(entry.borderBoxSize[0]?.blockSize ?? entry.target.getBoundingClientRect().height)
+        }
+      })
+      ro.observe(toolbarRef.current)
+      return () => ro.disconnect()
+    }
+  }, [])
 
   const handleActualizar = useCallback(() => {
     refetch()
@@ -86,13 +100,14 @@ function ListaCajaPage() {
 
       {/* ── Toolbar ── */}
       <div
+        ref={toolbarRef}
         className="sticky top-0 z-20"
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          padding: '10px 16px',
-          marginBottom: '12px',
+          padding: '6px 16px',
+          marginBottom: '6px',
           backgroundColor: 'var(--color-fondo-card)',
           border: '1px solid var(--color-borde)',
           borderRadius: '8px',
@@ -147,51 +162,51 @@ function ListaCajaPage() {
           No hay pacientes para esta fecha.
         </div>
       ) : (
-        <div style={{ borderRadius: '10px', overflow: 'auto' }}>
+        <div style={{ borderRadius: '10px' }}>
           <table className="border-collapse bg-[var(--color-fondo-card)]" style={{ minWidth: '100%', tableLayout: 'fixed' }}>
-            <thead className="sticky top-0 z-10" style={{ backgroundColor: '#0b2340' }}>
+            <thead className="z-10" style={{ position: 'sticky', top: `${toolbarHeight}px`, backgroundColor: 'var(--color-primario)' }}>
               <tr>
                 {/* Turno — sticky */}
                 <th
-                  className="sticky left-0 z-[11] py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12"
-                  style={{ width: '40px', backgroundColor: '#0b2340', borderTopLeftRadius: '10px' }}
+                  className="sticky left-0 z-[11] py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12"
+                  style={{ width: '40px', backgroundColor: 'var(--color-primario)', borderTopLeftRadius: '10px' }}
                 >
                   T
                 </th>
                 {/* Nombre — sticky */}
                 <th
-                  className="sticky z-[11] py-4 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12"
-                  style={{ left: '40px', width: '160px', paddingLeft: '6px', backgroundColor: '#0b2340' }}
+                  className="sticky z-[11] py-1.5 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12"
+                  style={{ left: '40px', width: '160px', paddingLeft: '6px', backgroundColor: 'var(--color-primario)' }}
                 >
                   Nombre del Paciente
                 </th>
                 {/* Edad */}
-                <th className="py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '38px' }}>
+                <th className="py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '38px' }}>
                   Edad
                 </th>
                 {/* Paquete */}
-                <th className="py-4 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '180px', paddingLeft: '6px' }}>
+                <th className="py-1.5 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '180px', paddingLeft: '6px' }}>
                   Paquete
                 </th>
                 {/* Peso */}
-                <th className="py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '48px' }}>
+                <th className="py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '48px' }}>
                   Peso
                 </th>
                 {/* Talla */}
-                <th className="py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '48px' }}>
+                <th className="py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '48px' }}>
                   Talla
                 </th>
                 {/* Desayuno */}
-                <th className="py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '40px' }}>
-                  <div className="flex flex-col items-center justify-center h-[46px]">
+                <th className="py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '40px' }}>
+                  <div className="flex flex-col items-center justify-center h-[32px]">
                     <span className="inline-block whitespace-nowrap text-[0.65rem] font-bold tracking-wide -rotate-45 origin-center leading-none">
                       Des
                     </span>
                   </div>
                 </th>
                 {/* Tarjeta */}
-                <th className="py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '40px' }}>
-                  <div className="flex flex-col items-center justify-center h-[46px]">
+                <th className="py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '40px' }}>
+                  <div className="flex flex-col items-center justify-center h-[32px]">
                     <span className="inline-block whitespace-nowrap text-[0.65rem] font-bold tracking-wide -rotate-45 origin-center leading-none">
                       Tar
                     </span>
@@ -201,11 +216,11 @@ function ListaCajaPage() {
                 {ESTUDIOS_COLUMNAS.map((est) => (
                   <th
                     key={est.id}
-                    className="px-0 py-4 text-center font-semibold text-white border-b-2 border-b-white/12 align-middle"
+                    className="px-0 py-1.5 text-center font-semibold text-white border-b-2 border-b-white/12 align-middle"
                     style={{ width: '32px' }}
                     title={est.nombre}
                   >
-                    <div className="flex flex-col items-center justify-center h-[46px]">
+                    <div className="flex flex-col items-center justify-center h-[32px]">
                       <span className="inline-block whitespace-nowrap text-[0.65rem] font-bold tracking-wide -rotate-45 origin-center leading-none">
                         {est.abrev}
                       </span>
@@ -214,7 +229,7 @@ function ListaCajaPage() {
                 ))}
                 {/* Médico Internista */}
                 <th
-                  className="py-4 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12"
+                  className="py-1.5 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12"
                   style={{ width: '160px', paddingLeft: '6px', borderTopRightRadius: '10px' }}
                 >
                   Médico Internista
@@ -239,7 +254,7 @@ function ListaCajaPage() {
                   <tr key={pac.seguimientoId} style={{ backgroundColor: rowBgBase }}>
                     {/* Turno — sticky */}
                     <td
-                      className="sticky left-0 z-[9] px-0 py-[6px] text-center border-b border-b-[var(--color-borde)]"
+                      className="sticky left-0 z-[9] px-0 py-[2px] text-center border-b border-b-[var(--color-borde)]"
                       style={{ backgroundColor: turnoBg }}
                     >
                       <span className="inline-flex items-center justify-center w-[18px] h-[18px] rounded-full bg-[rgba(10,31,92,0.08)] text-[var(--color-primario)] font-bold text-[0.7rem]">
@@ -248,7 +263,7 @@ function ListaCajaPage() {
                     </td>
                     {/* Nombre — sticky, link a /caja/$seguimientoId */}
                     <td
-                      className="sticky z-[9] py-[6px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden"
+                      className="sticky z-[9] py-[2px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden"
                       style={{ left: '40px', backgroundColor: nombreBg, paddingLeft: '5px' }}
                     >
                       <Link
@@ -261,55 +276,41 @@ function ListaCajaPage() {
                       </Link>
                     </td>
                     {/* Edad */}
-                    <td className="px-0 py-[6px] text-center border-b border-b-[var(--color-borde)] text-[0.7rem]">
+                    <td className="px-0 py-[2px] text-center border-b border-b-[var(--color-borde)] text-[0.7rem]">
                       {pac.edad ?? '—'}
                     </td>
                     {/* Paquete */}
-                    <td className="py-[6px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden" style={{ paddingLeft: '6px' }}>
+                    <td className="py-[2px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden" style={{ paddingLeft: '6px' }}>
                       {pac.paqueteNombre ?? '—'}
                     </td>
                     {/* Peso */}
-                    <td className="px-0 py-[6px] text-center border-b border-b-[var(--color-borde)] text-[0.7rem]">
+                    <td className="px-0 py-[2px] text-center border-b border-b-[var(--color-borde)] text-[0.7rem]">
                       {(pac.peso ?? 0).toFixed(2)}
                     </td>
                     {/* Talla */}
-                    <td className="px-0 py-[6px] text-center border-b border-b-[var(--color-borde)] text-[0.7rem]">
+                    <td className="px-0 py-[2px] text-center border-b border-b-[var(--color-borde)] text-[0.7rem]">
                       {(pac.talla ?? 0).toFixed(2)}
                     </td>
                     {/* Desayuno — badge read-only */}
-                    <td className="px-0 py-[6px] text-center border-b border-b-[var(--color-borde)] align-middle">
+                    <td className="px-0 py-[2px] text-center border-b border-b-[var(--color-borde)] align-middle">
                       <span
                         style={{
-                          backgroundColor: DESAYUNO_MAP[pac.desayuno].bg,
-                          color: DESAYUNO_MAP[pac.desayuno].textColor,
-                          fontSize: '0.6rem',
+                          color: DESAYUNO_MAP[pac.desayuno].color,
+                          fontSize: '0.7rem',
                           fontWeight: 700,
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '4px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
                         }}
                       >
                         {DESAYUNO_MAP[pac.desayuno].label}
                       </span>
                     </td>
                     {/* Tarjeta Ent. Res. — badge read-only */}
-                    <td className="px-0 py-[6px] text-center border-b border-b-[var(--color-borde)] align-middle">
+                    <td className="px-0 py-[2px] text-center border-b border-b-[var(--color-borde)] align-middle">
                       {pac.tarjetaEntRes != null ? (
                         <span
                           style={{
-                            backgroundColor: (TARJETA_MAP[pac.tarjetaEntRes] ?? TARJETA_MAP[0]).bg,
-                            color: (TARJETA_MAP[pac.tarjetaEntRes] ?? TARJETA_MAP[0]).textColor,
-                            fontSize: '0.6rem',
+                            color: (TARJETA_MAP[pac.tarjetaEntRes] ?? TARJETA_MAP[0]).color,
+                            fontSize: '0.7rem',
                             fontWeight: 700,
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '4px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
                           }}
                         >
                           {(TARJETA_MAP[pac.tarjetaEntRes] ?? TARJETA_MAP[0]).label}
@@ -325,13 +326,13 @@ function ListaCajaPage() {
                       return (
                         <td
                           key={est.id}
-                          style={{ padding: '2px', textAlign: 'center', borderBottom: '1px solid var(--color-borde)', verticalAlign: 'middle' }}
+                          style={{ padding: '0px', textAlign: 'center', borderBottom: '1px solid var(--color-borde)', verticalAlign: 'middle' }}
                         >
                           <span
-                            className="flex items-center justify-center text-[0.6rem] font-bold select-none"
+                            className="flex items-center justify-center text-[0.55rem] font-bold select-none"
                             style={{
-                              width: '28px',
-                              height: '28px',
+                              width: '22px',
+                              height: '22px',
                               margin: '0 auto',
                               backgroundColor: estatus.esBorde ? 'transparent' : estatus.color,
                               border: estatus.esBorde ? '1.5px solid #d1d5db' : 'none',
@@ -347,7 +348,7 @@ function ListaCajaPage() {
                       )
                     })}
                     {/* Médico Internista */}
-                    <td className="py-[6px] border-b border-b-[var(--color-borde)] whitespace-normal break-words text-[0.7rem] leading-tight overflow-hidden" style={{ paddingLeft: '6px' }}>
+                    <td className="py-[2px] border-b border-b-[var(--color-borde)] whitespace-normal break-words text-[0.7rem] leading-tight overflow-hidden" style={{ paddingLeft: '6px' }}>
                       {pac.medicoInternista ?? <span className="text-[var(--color-texto-suave)]">SIN ASIGNAR</span>}
                     </td>
                   </tr>
