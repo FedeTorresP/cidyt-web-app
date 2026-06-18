@@ -228,6 +228,62 @@ async function fetchReporteEstadistica(rango: RangoUtc): Promise<FilaEstadistica
   return results
 }
 
+// ─── Reporte de Caja (placeholder) ───────────────────────────────────────────
+
+export interface FilaCaja {
+  pacienteNombre: string
+  empresa: string | null
+  folio: string | null
+  total: number
+  fechaRegistro: Date
+}
+
+/**
+ * Placeholder — consulta seguimientos y devuelve datos mínimos con formato de caja.
+ * Se reemplazará cuando exista la colección real de facturación/caja en Firestore.
+ */
+async function fetchReporteCaja(rango: RangoUtc): Promise<FilaCaja[]> {
+  const db = getFirebaseFirestore()
+  const segQuery = query(
+    collection(db, 'seguimientos'),
+    where('activo', '==', true),
+    where('fechaIngresoUtc', '>=', Timestamp.fromDate(rango.startUtc)),
+    where('fechaIngresoUtc', '<=', Timestamp.fromDate(rango.endUtc)),
+    orderBy('fechaIngresoUtc', 'asc'),
+  )
+  const snapshot = await getDocs(segQuery)
+
+  return Promise.all(
+    snapshot.docs.map(async (d) => {
+      const data = d.data()
+
+      let pacienteNombre = ''
+      if (data.pacienteId) {
+        const pacDoc = await getDoc(doc(db, 'pacientes', data.pacienteId))
+        if (pacDoc.exists()) {
+          pacienteNombre = buildPacienteNombre(pacDoc.data()!)
+        }
+      }
+
+      let empresaNombre: string | null = null
+      if (data.empresaId) {
+        const empDoc = await getDoc(doc(db, 'empresas', data.empresaId))
+        if (empDoc.exists()) {
+          empresaNombre = (empDoc.data()?.nombre as string) ?? null
+        }
+      }
+
+      return {
+        pacienteNombre,
+        empresa: empresaNombre,
+        folio: data.folio ?? null,
+        total: data.total ?? 0,
+        fechaRegistro: data.fechaIngresoUtc?.toDate?.() ?? new Date(),
+      }
+    }),
+  )
+}
+
 // ─── Hooks ───────────────────────────────────────────────────────────────────
 
 export function useReporteCheckup(rango: RangoUtc | null) {
@@ -253,3 +309,15 @@ export function useReporteEstadistica(rango: RangoUtc | null) {
     enabled: !!rango,
   })
 }
+
+export function useReporteCaja(rango: RangoUtc | null) {
+  return useQuery({
+    queryKey: ['reporte-caja', rango?.startUtc.toISOString(), rango?.endUtc.toISOString()],
+    queryFn: () => fetchReporteCaja(rango!),
+    enabled: !!rango,
+  })
+}
+
+// ─── Funciones de fetch directas (para uso imperativo en la página) ──────────
+
+export { fetchReporteCheckup, fetchReporteGeneral, fetchReporteEstadistica, fetchReporteCaja }

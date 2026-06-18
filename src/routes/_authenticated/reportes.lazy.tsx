@@ -1,129 +1,404 @@
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { type ColumnDef } from '@tanstack/react-table'
+import { toast, Toaster } from 'sonner'
+import { Download, Loader2 } from 'lucide-react'
 import {
-  useReporteCheckup,
-  useReporteGeneral,
-  useReporteEstadistica,
-  type FilaCheckup,
-  type FilaGeneral,
-  type FilaEstadistica,
+  fetchReporteGeneral,
+  fetchReporteCaja,
+  fetchReporteEstadistica,
+  fetchReporteCheckup,
   type RangoUtc,
 } from '@/hooks/use-reportes'
+import { useCubiculos } from '@/hooks/use-cubiculos'
 import { getDayRangeUtc } from '@/services/time'
-import { nowMX, formatDateMX, formatTimeMX } from '@/lib/timezone'
-import { DataTable } from '@/components/shared/DataTable'
+import { formatDateMX, nowMX } from '@/lib/timezone'
+import {
+  exportReporteGeneral,
+  exportReporteCaja,
+  exportReporteEstadistica,
+  exportReporteCheckup,
+} from '@/lib/excel-export'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 
 export const Route = createLazyFileRoute('/_authenticated/reportes')({
   component: ReportesPage,
 })
 
-type TipoReporte = 'checkup' | 'general' | 'estadistica'
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const checkupColumns: ColumnDef<FilaCheckup, unknown>[] = [
-  { accessorKey: 'pacienteNombre', header: 'Paciente' },
-  {
-    accessorKey: 'fechaIngresoLocal',
-    header: 'Ingreso',
-    cell: ({ getValue }) => {
-      const date = getValue() as Date
-      return `${formatDateMX(date)} ${formatTimeMX(date)}`
-    },
-  },
-  { accessorKey: 'estatusSeguimientoNombre', header: 'Estatus' },
-  { accessorKey: 'totalEstudios', header: 'Estudios' },
-]
+function getTodayMX(): string {
+  return formatDateMX(nowMX())
+}
 
-const generalColumns: ColumnDef<FilaGeneral, unknown>[] = [
-  { accessorKey: 'pacienteNombre', header: 'Paciente' },
-  {
-    accessorKey: 'fechaIngresoLocal',
-    header: 'Ingreso',
-    cell: ({ getValue }) => {
-      const date = getValue() as Date
-      return `${formatDateMX(date)} ${formatTimeMX(date)}`
-    },
-  },
-  { accessorKey: 'estatusSeguimientoNombre', header: 'Estatus' },
-  { accessorKey: 'empresaNombre', header: 'Empresa', cell: ({ getValue }) => getValue() ?? '—' },
-  { accessorKey: 'estudios', header: 'Estudios' },
-]
+function getFirstDayOfMonthMX(): string {
+  const today = getTodayMX()
+  return today.substring(0, 8) + '01'
+}
 
-const estadisticaColumns: ColumnDef<FilaEstadistica, unknown>[] = [
-  { accessorKey: 'estudioNombre', header: 'Estudio' },
-  { accessorKey: 'estudioTipoNombre', header: 'Tipo', cell: ({ getValue }) => getValue() ?? '—' },
-  { accessorKey: 'total', header: 'Total' },
-]
+function buildRango(fechaInicio: string, fechaFin: string): RangoUtc {
+  const start = getDayRangeUtc(fechaInicio)
+  const end = getDayRangeUtc(fechaFin)
+  return { startUtc: start.startUtc, endUtc: end.endUtc }
+}
+
+// ─── Tipos de descarga ───────────────────────────────────────────────────────
+
+type ReporteKey = 'general' | 'caja' | 'estadistica' | 'checkup'
+
+// ─── Componente principal ────────────────────────────────────────────────────
 
 function ReportesPage() {
-  const [tipo, setTipo] = useState<TipoReporte>('checkup')
-  const [fechaInicio, setFechaInicio] = useState(() => formatDateMX(nowMX()))
-  const [fechaFin, setFechaFin] = useState(() => formatDateMX(nowMX()))
-  const [rango, setRango] = useState<RangoUtc | null>(null)
+  const today = getTodayMX()
+  const firstOfMonth = getFirstDayOfMonthMX()
 
-  const checkup = useReporteCheckup(tipo === 'checkup' ? rango : null)
-  const general = useReporteGeneral(tipo === 'general' ? rango : null)
-  const estadistica = useReporteEstadistica(tipo === 'estadistica' ? rango : null)
+  // Estado de fechas por reporte
+  const [fechaGeneral, setFechaGeneral] = useState(today)
+  const [fechaCheckup, setFechaCheckup] = useState(today)
+  const [fechaCajaInicio, setFechaCajaInicio] = useState(firstOfMonth)
+  const [fechaCajaFin, setFechaCajaFin] = useState(today)
+  const [fechaEstInicio, setFechaEstInicio] = useState(firstOfMonth)
+  const [fechaEstFin, setFechaEstFin] = useState(today)
 
-  function handleGenerar() {
-    const start = getDayRangeUtc(fechaInicio)
-    const end = getDayRangeUtc(fechaFin)
-    setRango({ startUtc: start.startUtc, endUtc: end.endUtc })
+  // Cubículos
+  const [cubiculoId, setCubiculoId] = useState('')
+  const cubiculosQuery = useCubiculos()
+  const cubiculos = cubiculosQuery.data ?? []
+
+  // Estado de descarga
+  const [downloading, setDownloading] = useState<ReporteKey | null>(null)
+
+  // ─── Handlers de descarga ────────────────────────────────────────────
+
+  async function handleDescargarGeneral() {
+    setDownloading('general')
+    try {
+      const rango = buildRango(fechaGeneral, fechaGeneral)
+      const data = await fetchReporteGeneral(rango)
+      await exportReporteGeneral(data, fechaGeneral)
+      toast.success('Reporte General descargado correctamente.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido'
+      toast.error('Error al generar el reporte.', { description: msg })
+    } finally {
+      setDownloading(null)
+    }
   }
 
-  const isLoading = checkup.isLoading || general.isLoading || estadistica.isLoading
+  async function handleDescargarCaja() {
+    if (fechaCajaFin < fechaCajaInicio) {
+      toast.warning('La fecha fin no puede ser menor que la fecha inicio.')
+      return
+    }
+    setDownloading('caja')
+    try {
+      const rango = buildRango(fechaCajaInicio, fechaCajaFin)
+      const data = await fetchReporteCaja(rango)
+      await exportReporteCaja(data, fechaCajaInicio, fechaCajaFin)
+      toast.success('Reporte de Caja descargado correctamente.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido'
+      toast.error('Error al generar el reporte.', { description: msg })
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  async function handleDescargarEstadistica() {
+    if (!cubiculoId) {
+      toast.warning('Seleccione un cubículo para el reporte de estadística.')
+      return
+    }
+    if (fechaEstFin < fechaEstInicio) {
+      toast.warning('La fecha fin no puede ser menor que la fecha inicio.')
+      return
+    }
+    setDownloading('estadistica')
+    try {
+      const rango = buildRango(fechaEstInicio, fechaEstFin)
+      const data = await fetchReporteEstadistica(rango)
+      const cubNombre = cubiculos.find((c) => c.id === cubiculoId)?.nombre ?? cubiculoId
+      await exportReporteEstadistica(data, cubNombre, fechaEstInicio, fechaEstFin)
+      toast.success('Reporte de Estadística descargado correctamente.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido'
+      toast.error('Error al generar el reporte.', { description: msg })
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  async function handleDescargarCheckup() {
+    setDownloading('checkup')
+    try {
+      const rango = buildRango(fechaCheckup, fechaCheckup)
+      const data = await fetchReporteCheckup(rango)
+      await exportReporteCheckup(data, fechaCheckup)
+      toast.success('Reporte Control CheckUp descargado correctamente.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido'
+      toast.error('Error al generar el reporte.', { description: msg })
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  // ─── Render ──────────────────────────────────────────────────────────
 
   return (
-    <div>
-      <h1 className="page-title">Reportes</h1>
+    <div className="max-w-[1100px]">
+      <Toaster position="top-right" richColors closeButton />
 
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-sm">Filtros</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-3 flex-wrap">
+      <h1 className="text-xl font-bold mb-5">Reportes y Exportaci&oacute;n Excel</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* ────────────────────────────────────────────────────────────────
+         * Card 1 — Reporte General
+         * ──────────────────────────────────────────────────────────────── */}
+        <Card className="border-green-200">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-bold">Reporte General</CardTitle>
+              <span className="bg-blue-50 text-blue-600 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                Diario
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Pacientes del d&iacute;a con turno, datos personales, empresa, paquete, hora de
+              ingreso y estatus.
+            </p>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[var(--color-texto-suave)]">Tipo</label>
+              <label htmlFor="fecha-general" className="text-xs font-medium text-muted-foreground">
+                Fecha
+              </label>
+              <Input
+                id="fecha-general"
+                type="date"
+                value={fechaGeneral}
+                onChange={(e) => setFechaGeneral(e.target.value)}
+              />
+            </div>
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
+              onClick={handleDescargarGeneral}
+              disabled={downloading === 'general'}
+            >
+              {downloading === 'general' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar Excel
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* ────────────────────────────────────────────────────────────────
+         * Card 2 — Reporte de Caja
+         * ──────────────────────────────────────────────────────────────── */}
+        <Card className="border-green-200">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-bold">Reporte de Caja</CardTitle>
+              <span className="bg-blue-50 text-blue-600 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                Por rango
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Facturas del per&iacute;odo con datos de paciente, empresa, promotor, tipo de
+              servicio y factura.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="caja-inicio" className="text-xs font-medium text-muted-foreground">
+                  Fecha inicio
+                </label>
+                <Input
+                  id="caja-inicio"
+                  type="date"
+                  value={fechaCajaInicio}
+                  onChange={(e) => {
+                    setFechaCajaInicio(e.target.value)
+                    if (fechaCajaFin < e.target.value) setFechaCajaFin(e.target.value)
+                  }}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="caja-fin" className="text-xs font-medium text-muted-foreground">
+                  Fecha fin
+                </label>
+                <Input
+                  id="caja-fin"
+                  type="date"
+                  value={fechaCajaFin}
+                  min={fechaCajaInicio}
+                  onChange={(e) => setFechaCajaFin(e.target.value)}
+                />
+              </div>
+            </div>
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
+              onClick={handleDescargarCaja}
+              disabled={downloading === 'caja'}
+            >
+              {downloading === 'caja' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar Excel
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* ────────────────────────────────────────────────────────────────
+         * Card 3 — Estadística por Consultorio
+         * ──────────────────────────────────────────────────────────────── */}
+        <Card className="border-green-200">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-bold">
+                Estad&iacute;stica por Consultorio
+              </CardTitle>
+              <span className="bg-blue-50 text-blue-600 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                Por rango
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Sesiones de cub&iacute;culo del per&iacute;odo: m&eacute;dico, estatus, usuario y
+              fecha/hora de registro.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="est-inicio" className="text-xs font-medium text-muted-foreground">
+                  Fecha inicio
+                </label>
+                <Input
+                  id="est-inicio"
+                  type="date"
+                  value={fechaEstInicio}
+                  onChange={(e) => {
+                    setFechaEstInicio(e.target.value)
+                    if (fechaEstFin < e.target.value) setFechaEstFin(e.target.value)
+                  }}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="est-fin" className="text-xs font-medium text-muted-foreground">
+                  Fecha fin
+                </label>
+                <Input
+                  id="est-fin"
+                  type="date"
+                  value={fechaEstFin}
+                  min={fechaEstInicio}
+                  onChange={(e) => setFechaEstFin(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="est-cubiculo" className="text-xs font-medium text-muted-foreground">
+                Cub&iacute;culo
+              </label>
               <select
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value as TipoReporte)}
-                className="min-h-[32px] px-2 text-sm rounded-[var(--radius-default)] border border-[var(--color-borde)] w-auto"
+                id="est-cubiculo"
+                value={cubiculoId}
+                onChange={(e) => setCubiculoId(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                <option value="checkup">Checkup</option>
-                <option value="general">General</option>
-                <option value="estadistica">Estadística</option>
+                <option value="">— Seleccione cub&iacute;culo —</option>
+                {cubiculos.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre ?? c.id}
+                  </option>
+                ))}
               </select>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[var(--color-texto-suave)]">Desde</label>
-              <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="w-auto min-h-[32px] h-8 text-sm" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[var(--color-texto-suave)]">Hasta</label>
-              <Input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="w-auto min-h-[32px] h-8 text-sm" />
-            </div>
-            <Button size="sm" onClick={handleGenerar} disabled={isLoading}>
-              {isLoading ? <LoadingSpinner size="sm" className="border-white/35 border-t-white" /> : null}
-              Generar
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
+              onClick={handleDescargarEstadistica}
+              disabled={downloading === 'estadistica' || !cubiculoId}
+            >
+              {downloading === 'estadistica' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar Excel
+                </>
+              )}
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {tipo === 'checkup' && rango && (
-        <DataTable columns={checkupColumns} data={checkup.data ?? []} />
-      )}
-      {tipo === 'general' && rango && (
-        <DataTable columns={generalColumns} data={general.data ?? []} />
-      )}
-      {tipo === 'estadistica' && rango && (
-        <DataTable columns={estadisticaColumns} data={estadistica.data ?? []} />
-      )}
+        {/* ────────────────────────────────────────────────────────────────
+         * Card 4 — Control CheckUp
+         * ──────────────────────────────────────────────────────────────── */}
+        <Card className="border-green-200">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-bold">Control CheckUp</CardTitle>
+              <span className="bg-blue-50 text-blue-600 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                Diario
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Pacientes del d&iacute;a con el estatus de cada estudio del paquete, una columna
+              por estudio.
+            </p>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="fecha-checkup" className="text-xs font-medium text-muted-foreground">
+                Fecha
+              </label>
+              <Input
+                id="fecha-checkup"
+                type="date"
+                value={fechaCheckup}
+                onChange={(e) => setFechaCheckup(e.target.value)}
+              />
+            </div>
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
+              onClick={handleDescargarCheckup}
+              disabled={downloading === 'checkup'}
+            >
+              {downloading === 'checkup' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar Excel
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
