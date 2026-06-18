@@ -5,7 +5,25 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
-## [3.2.2] — 2026-06-17
+## [3.2.2] — 2026-06-18 [`69485b3`...`029a7df`](https://github.com/Medica-Sur-TI/cidyt-web-app/compare/69485b3...029a7df)
+
+### Médico por Ubicación y Día — Página Lugares
+
+#### Agregado
+- **Página "Médico por Ubicación y Día"** (`/lugares`): reescritura completa del stub placeholder con paridad operativa y estética vs legacy v2.5.4
+- **Sección formulario "Nueva Asignación"**: grid 2×2 responsive (Médico, Lugar de Estudio, Fecha, Horario) con selects cargados desde catálogos Firestore, fecha por defecto hoy en zona America/Mexico_City, validación obligatoria y detección de duplicados
+- **Sección tabla "Asignaciones del Día"**: toolbar con date picker + botón "Actualizar", tabla estilizada con columnas Médico/Lugar/Horario/Fecha/Eliminar, filas alternadas, botón destructive por fila con `confirm()`
+- **Hook `use-medico-dia.ts`**: `useMedicoDiaAsignaciones(fecha)` (query con resolución de nombres), `useCrearAsignacion()` (mutation con check de duplicado), `useEliminarAsignacion()` (borrado lógico `activo: false`)
+- **Hook `use-lugares.ts`**: `useLugaresActivos()` — query a colección `lugares` where `activo==true` orderBy nombre
+- **Hook `use-horarios.ts`**: `useHorariosActivos()` — query a colección `horarios` where `activo==true` orderBy nombre
+- **Interface `MedicoLugarDia`** en `src/types/models.ts`: tipo para la colección `medico_lugar_dia`
+
+#### Modificado
+- **`medico-dia.tsx`**: reemplazado con redirect a `/lugares` (la funcionalidad ahora vive en la ruta lugares)
+
+---
+
+## [3.2.2] — 2026-06-17 [`69485b3`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/69485b3)
 
 ### Lista de Cubículos — Dashboard de Monitoreo
 
@@ -22,7 +40,7 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
-## [3.2.1] — 2026-06-17
+## [3.2.1] — 2026-06-17 [`8ced5fb`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/8ced5fb)
 
 ### Estudios Externos + Consolidación sap-pipeline
 
@@ -39,7 +57,7 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
-## [3.2.0] — 2026-06-17
+## [3.2.0] — 2026-06-17 [`01db6d4`...`c55be39`](https://github.com/Medica-Sur-TI/cidyt-web-app/compare/01db6d4...c55be39)
 
 ### Registro de Pacientes, Lista de Pacientes Caja, Caja y Facturación (detalle)
 
@@ -69,7 +87,7 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
-## [3.1.1] — 2026-06-16
+## [3.1.1] — 2026-06-16 [`27fa8ff`...`de7ac01`](https://github.com/Medica-Sur-TI/cidyt-web-app/compare/27fa8ff...de7ac01)
 
 ### Seguimiento de Paciente, Modal Obs mejorado, Estado compartido
 

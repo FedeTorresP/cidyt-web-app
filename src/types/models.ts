@@ -167,3 +167,15 @@ export interface Paquete {
   estudios: string[]
   activo: boolean
 }
+
+/** Asignación médico-lugar-día (colección `medico_lugar_dia`). */
+export interface MedicoLugarDia {
+  id: string
+  medicoId: string
+  lugarId: string
+  horarioId: string
+  fecha: string
+  activo: boolean
+  creadoPor?: string
+  fechaCreacion?: Date
+}
