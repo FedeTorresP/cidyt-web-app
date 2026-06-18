@@ -1,5 +1,5 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { nowMX, formatDateMX } from '@/lib/timezone'
 import { useListaDia, useUpdatePacienteCache } from '@/hooks/use-lista-dia'
@@ -227,6 +227,20 @@ function ListaDiaPage() {
   const { data: pacientes = [], refetch } = useListaDia(fecha)
   const updateCache = useUpdatePacienteCache()
   const [modalPaciente, setModalPaciente] = useState<PacienteListaDia | null>(null)
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const [toolbarHeight, setToolbarHeight] = useState(0)
+
+  useEffect(() => {
+    if (toolbarRef.current) {
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setToolbarHeight(entry.borderBoxSize[0]?.blockSize ?? entry.target.getBoundingClientRect().height)
+        }
+      })
+      ro.observe(toolbarRef.current)
+      return () => ro.disconnect()
+    }
+  }, [])
 
   // Actualizar manualmente
   const handleActualizar = useCallback(() => {
@@ -257,8 +271,9 @@ function ListaDiaPage() {
 
       {/* Toolbar */}
       <div
+        ref={toolbarRef}
         className="sticky top-0 z-20"
-        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', marginBottom: '12px', backgroundColor: 'var(--color-fondo-card)', border: '1px solid var(--color-borde)', borderRadius: '8px', boxShadow: '0 2px 8px rgba(10,31,92,0.06)' }}
+        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '6px 16px', marginBottom: '6px', backgroundColor: 'var(--color-fondo-card)', border: '1px solid var(--color-borde)', borderRadius: '8px', boxShadow: '0 2px 8px rgba(10,31,92,0.06)' }}
       >
         <span style={{ fontWeight: 500, color: 'var(--color-texto-suave)', fontSize: '0.875rem', flexShrink: 0 }}>Fecha:</span>
         <input
@@ -280,7 +295,7 @@ function ListaDiaPage() {
 
       {/* Leyenda de colores */}
       <div
-        style={{ backgroundColor: 'var(--color-fondo-card)', border: '1px solid var(--color-borde)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}
+        style={{ backgroundColor: 'var(--color-fondo-card)', border: '1px solid var(--color-borde)', borderRadius: '8px', padding: '6px 16px', marginBottom: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}
       >
         <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-texto)' }}>Código de Colores</span>
         <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '10px', alignItems: 'center', overflowX: 'auto', paddingBottom: '4px' }}>
@@ -299,30 +314,30 @@ function ListaDiaPage() {
           No hay pacientes para esta fecha.
         </div>
       ) : (
-        <div style={{ borderRadius: '10px', overflow: 'hidden' }}>
+        <div style={{ borderRadius: '10px' }}>
           <table className="border-collapse w-full bg-[var(--color-fondo-card)] table-fixed">
-            <thead className="bg-[var(--color-primario)] sticky top-0 z-10">
+            <thead className="bg-[var(--color-primario)] z-10" style={{ position: 'sticky', top: `${toolbarHeight}px` }}>
               <tr>
                 {/* Turno — sticky */}
-                <th className="sticky left-0 z-[11] bg-[var(--color-primario)] py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[40px]" style={{ paddingLeft: '1px', borderTopLeftRadius: '10px' }}>
+                <th className="sticky left-0 z-[11] bg-[var(--color-primario)] py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[40px]" style={{ paddingLeft: '1px', borderTopLeftRadius: '10px' }}>
                   Turno
                 </th>
                 {/* Nombre — sticky */}
-                <th className="sticky left-[20px] z-[11] bg-[var(--color-primario)] py-4 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[160px]" style={{ paddingLeft: '10px' }}>
+                <th className="sticky left-[20px] z-[11] bg-[var(--color-primario)] py-1.5 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[160px]" style={{ paddingLeft: '10px' }}>
                   Nombre del Paciente
                 </th>
                 {/* Desayuno */}
-                <th className="px-0 py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[55px]">
+                <th className="px-0 py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[55px]">
                   Desayuno
                 </th>
                 {/* Columnas de estudios */}
                 {ESTUDIOS_COLUMNAS.map((est) => (
                   <th
                     key={est.id}
-                    className="px-0 py-4 text-center font-semibold text-white border-b-2 border-b-white/12 align-middle w-[32px]"
+                    className="px-0 py-1.5 text-center font-semibold text-white border-b-2 border-b-white/12 align-middle w-[32px]"
                     title={est.nombre}
                   >
-                    <div className="flex flex-col items-center justify-center h-[46px]">
+                    <div className="flex flex-col items-center justify-center h-[32px]">
                       <span className="inline-block whitespace-nowrap text-[0.65rem] font-bold tracking-wide -rotate-45 origin-center leading-none">
                         {est.abrev}
                       </span>
@@ -330,16 +345,16 @@ function ListaDiaPage() {
                   </th>
                 ))}
                 {/* Obs */}
-                <th className="px-0 py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[36px]">
+                <th className="px-0 py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[36px]">
                   Obs
                 </th>
                 {/* Médico Internista */}
-                <th className="px-0 py-4 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[80px]">
+                <th className="px-1 py-1.5 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[90px]">
                   Médico Internista
                 </th>
                 {/* Vínculos */}
-                <th className="px-0 py-4 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[60px]" style={{ borderTopRightRadius: '10px' }}>
-                  Vínculos
+                <th className="px-0 py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[50px] overflow-visible" style={{ borderTopRightRadius: '10px' }}>
+                  <span style={{ position: 'relative', left: '-6px' }}>Vínculos</span>
                 </th>
               </tr>
             </thead>
@@ -368,7 +383,7 @@ function ListaDiaPage() {
                   <tr key={pac.seguimientoId} style={{ backgroundColor: rowBgBase }}>
                     {/* Turno — sticky */}
                     <td
-                      className="sticky left-0 z-[9] px-0 py-[14px] text-center border-b border-b-[var(--color-borde)]"
+                      className="sticky left-0 z-[9] px-0 py-[4px] text-center border-b border-b-[var(--color-borde)]"
                       style={{ backgroundColor: turnoBg }}
                     >
                       <span className="inline-flex items-center justify-center w-[18px] h-[18px] rounded-full bg-[rgba(10,31,92,0.08)] text-[var(--color-primario)] font-bold text-[0.7rem]">
@@ -377,7 +392,7 @@ function ListaDiaPage() {
                     </td>
                     {/* Nombre — sticky */}
                     <td
-                      className="sticky left-[40px] z-[9] py-[14px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden"
+                      className="sticky left-[40px] z-[9] py-[4px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden"
                       style={{ backgroundColor: nombreBg, paddingLeft: '5px' }}
                     >
                       <div className="flex items-center gap-0.5">
@@ -385,14 +400,14 @@ function ListaDiaPage() {
                           {pac.nombre}
                         </span>
                         {tienePadecimiento && !completo && (
-                          <svg className="w-2.5 h-2.5 shrink-0 text-[#F57C00]" viewBox="0 0 20 20" fill="currentColor">
+                          <svg className="w-4 h-4 shrink-0 text-[#F57C00] mr-1" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                           </svg>
                         )}
                       </div>
                     </td>
                     {/* Desayuno — pill badge */}
-                    <td className="px-0 py-[14px] text-center border-b border-b-[var(--color-borde)] align-middle">
+                    <td className="px-0 py-[4px] text-center border-b border-b-[var(--color-borde)] align-middle">
                       <div className="relative inline-flex items-center justify-center">
                         <select
                           value={pac.desayuno}
@@ -411,8 +426,8 @@ function ListaDiaPage() {
                             color: pac.desayuno === 1 ? '#1a1a1a' : '#ffffff',
                             fontSize: '0.6rem',
                             fontWeight: 700,
-                            width: '57px',
-                            height: '28px',
+                            width: '50px',
+                            height: '22px',
                             borderRadius: '4px',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -464,7 +479,7 @@ function ListaDiaPage() {
                     })}
 
                     {/* Obs — botón ojo → modal */}
-                    <td style={{ padding: '7px 2px', borderBottom: '1px solid var(--color-borde)', textAlign: 'center', verticalAlign: 'middle', overflow: 'visible' }}>
+                    <td style={{ padding: '2px 2px', borderBottom: '1px solid var(--color-borde)', textAlign: 'center', verticalAlign: 'middle', overflow: 'visible' }}>
                       <button
                         onClick={() => setModalPaciente(pac)}
                         className={pac.tieneAdicionales ? 'animate-[obsPulse_2s_ease-in-out_1]' : ''}
@@ -480,12 +495,12 @@ function ListaDiaPage() {
                     </td>
 
                     {/* Médico Internista */}
-                    <td className="px-0.5 py-[14px] border-b border-b-[var(--color-borde)] whitespace-normal break-words text-[0.7rem] leading-tight overflow-hidden">
+                    <td className="px-0.5 py-[4px] border-b border-b-[var(--color-borde)] whitespace-normal break-words text-[0.7rem] leading-tight overflow-hidden">
                       {pac.medicoInternista ?? <span className="text-[var(--color-texto-suave)] text-[0.7rem]">SIN ASIGNAR</span>}
                     </td>
 
                     {/* Vínculos */}
-                    <td style={{ padding: '7px 2px', borderBottom: '1px solid var(--color-borde)', textAlign: 'center', verticalAlign: 'middle', overflow: 'visible' }}>
+                    <td style={{ padding: '2px 2px', borderBottom: '1px solid var(--color-borde)', textAlign: 'center', verticalAlign: 'middle', overflow: 'visible' }}>
                       <Link
                         to="/paciente/$seguimientoId"
                         params={{ seguimientoId: pac.seguimientoId }}

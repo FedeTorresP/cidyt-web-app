@@ -5,7 +5,7 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
-## [3.2.2] — 2026-06-18 [`69485b3`...`029a7df`](https://github.com/Medica-Sur-TI/cidyt-web-app/compare/69485b3...029a7df)
+## [3.2.2] — 2026-06-18 [`69485b3`...`c660056`](https://github.com/Medica-Sur-TI/cidyt-web-app/compare/69485b3...c660056)
 
 ### Médico por Ubicación y Día — Página Lugares
 
