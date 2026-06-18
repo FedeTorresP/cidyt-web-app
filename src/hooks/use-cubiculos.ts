@@ -135,3 +135,76 @@ export function useSesionesCubiculo() {
     queryFn: fetchSesionesCubiculo,
   })
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DASHBOARD — Lista de Cubículos (polling API, full-screen dark)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+import { getFirebaseAuth } from '@/lib/firebase'
+
+export interface CubiculoItem {
+  cubiculoId: number
+  nombre: string
+  ordenMostrar: number
+  medicoId: number | null
+  medicoNombre: string | null    // Solo apellido paterno, max 11 chars
+  estatusId: number | null       // 1=Disponible, 2=Ocupado, 3=Terminado, 4=Conectado, 5=Inactivo
+  estatusNombre: string | null
+  fechaCrea: string | null       // ISO timestamp del inicio de sesión
+  minTranscurridos: number | null
+}
+
+const API_BASE = import.meta.env.VITE_API_URL ?? ''
+
+async function fetchCubiculosListado(): Promise<CubiculoItem[]> {
+  try {
+    const headers: HeadersInit = { 'Content-Type': 'application/json' }
+    const user = getFirebaseAuth().currentUser
+    if (user) {
+      const token = await user.getIdToken()
+      headers.Authorization = `Bearer ${token}`
+    }
+    const res = await fetch(`${API_BASE}/api/cubiculo/listado`, { headers })
+    if (res.ok) return await res.json()
+  } catch {
+    // fallback to mock
+  }
+  return MOCK_CUBICULOS_LISTADO
+}
+
+export function useCubiculosListado() {
+  return useQuery({
+    queryKey: ['cubiculos-listado'],
+    queryFn: fetchCubiculosListado,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  })
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOCK — 21 cubículos con estados variados
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const MOCK_CUBICULOS_LISTADO: CubiculoItem[] = [
+  { cubiculoId: 1, nombre: 'Consultorio 1', ordenMostrar: 1, medicoId: null, medicoNombre: null, estatusId: 1, estatusNombre: 'Disponible', fechaCrea: null, minTranscurridos: null },
+  { cubiculoId: 2, nombre: 'Consultorio 2', ordenMostrar: 2, medicoId: 102, medicoNombre: 'SANCHEZ', estatusId: 2, estatusNombre: 'Ocupado', fechaCrea: '2026-06-17T13:47:00Z', minTranscurridos: 30 },
+  { cubiculoId: 3, nombre: 'Consultorio 3', ordenMostrar: 3, medicoId: null, medicoNombre: null, estatusId: 1, estatusNombre: 'Disponible', fechaCrea: null, minTranscurridos: null },
+  { cubiculoId: 4, nombre: 'Consultorio 4', ordenMostrar: 4, medicoId: 103, medicoNombre: 'TORRES', estatusId: 2, estatusNombre: 'Ocupado', fechaCrea: '2026-06-17T13:37:00Z', minTranscurridos: 40 },
+  { cubiculoId: 6, nombre: 'Consultorio 6', ordenMostrar: 5, medicoId: null, medicoNombre: null, estatusId: 1, estatusNombre: 'Disponible', fechaCrea: null, minTranscurridos: null },
+  { cubiculoId: 7, nombre: 'Consultorio 7', ordenMostrar: 6, medicoId: 104, medicoNombre: 'RUIZ', estatusId: 2, estatusNombre: 'Ocupado', fechaCrea: '2026-06-17T14:07:00Z', minTranscurridos: 10 },
+  { cubiculoId: 8, nombre: 'Consultorio 8 | Ortopedia', ordenMostrar: 7, medicoId: 101, medicoNombre: 'HOYO', estatusId: 2, estatusNombre: 'Ocupado', fechaCrea: '2026-06-17T14:12:00Z', minTranscurridos: 5 },
+  { cubiculoId: 10, nombre: 'Consultorio 10', ordenMostrar: 8, medicoId: null, medicoNombre: null, estatusId: 1, estatusNombre: 'Disponible', fechaCrea: null, minTranscurridos: null },
+  { cubiculoId: 11, nombre: 'Consultorio 11 | Ortopedia', ordenMostrar: 9, medicoId: null, medicoNombre: null, estatusId: 1, estatusNombre: 'Disponible', fechaCrea: null, minTranscurridos: null },
+  { cubiculoId: 12, nombre: 'Consultorio 12', ordenMostrar: 10, medicoId: 106, medicoNombre: 'MENDEZ', estatusId: 2, estatusNombre: 'Ocupado', fechaCrea: '2026-06-17T13:42:00Z', minTranscurridos: 35 },
+  { cubiculoId: 14, nombre: 'Consultorio 14', ordenMostrar: 11, medicoId: null, medicoNombre: null, estatusId: 1, estatusNombre: 'Disponible', fechaCrea: null, minTranscurridos: null },
+  { cubiculoId: 15, nombre: 'A. Mayor', ordenMostrar: 12, medicoId: null, medicoNombre: null, estatusId: 1, estatusNombre: 'Disponible', fechaCrea: null, minTranscurridos: null },
+  { cubiculoId: 16, nombre: 'Oftalmología 1', ordenMostrar: 13, medicoId: 107, medicoNombre: 'VEGA', estatusId: 2, estatusNombre: 'Ocupado', fechaCrea: '2026-06-17T14:02:00Z', minTranscurridos: 15 },
+  { cubiculoId: 17, nombre: 'Oftalmología 2', ordenMostrar: 14, medicoId: null, medicoNombre: null, estatusId: 1, estatusNombre: 'Disponible', fechaCrea: null, minTranscurridos: null },
+  { cubiculoId: 18, nombre: 'Dental', ordenMostrar: 15, medicoId: 105, medicoNombre: 'GARCIA', estatusId: 2, estatusNombre: 'Ocupado', fechaCrea: '2026-06-17T14:12:00Z', minTranscurridos: 0 },
+  { cubiculoId: 19, nombre: 'Audiometría 1', ordenMostrar: 16, medicoId: 108, medicoNombre: 'AYALA', estatusId: 2, estatusNombre: 'Ocupado', fechaCrea: '2026-06-17T13:52:00Z', minTranscurridos: 25 },
+  { cubiculoId: 20, nombre: 'Audiometría 2', ordenMostrar: 17, medicoId: null, medicoNombre: null, estatusId: 1, estatusNombre: 'Disponible', fechaCrea: null, minTranscurridos: null },
+  { cubiculoId: 21, nombre: 'Nutrición 1', ordenMostrar: 18, medicoId: null, medicoNombre: null, estatusId: 1, estatusNombre: 'Disponible', fechaCrea: null, minTranscurridos: null },
+  { cubiculoId: 22, nombre: 'Nutrición 2', ordenMostrar: 19, medicoId: 109, medicoNombre: 'LOPEZ', estatusId: 2, estatusNombre: 'Ocupado', fechaCrea: '2026-06-17T13:57:00Z', minTranscurridos: 20 },
+  { cubiculoId: 23, nombre: 'Ginecología', ordenMostrar: 20, medicoId: null, medicoNombre: null, estatusId: 1, estatusNombre: 'Disponible', fechaCrea: null, minTranscurridos: null },
+]

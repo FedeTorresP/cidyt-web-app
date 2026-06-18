@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet, useNavigate } from '@tanstack/react-router'
+import { Outlet, useNavigate, useLocation } from '@tanstack/react-router'
 import { useAuth } from '@/hooks/use-auth'
 import { useMenu } from '@/hooks/use-menu'
 import { logout } from '@/services/auth'
@@ -9,7 +9,9 @@ import { AlertBanner } from '@/components/shared/AlertBanner'
 
 export function AppShell() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, firebaseUser } = useAuth()
+  const isCubiculos = location.pathname === '/cubiculo/listado'
   const { data: menuItems, isLoading: menuLoading, error: menuError } = useMenu()
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
@@ -148,10 +150,10 @@ export function AppShell() {
             minWidth: 36,
             maxWidth: 36,
             padding: 0,
-            backgroundColor: 'var(--color-primario)',
-            color: '#fff',
+            backgroundColor: isCubiculos ? 'transparent' : 'var(--color-primario)',
+            color: isCubiculos ? '#e2e8f0' : '#fff',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: isCubiculos ? '0' : '6px',
             touchAction: 'manipulation',
             display: 'flex',
             alignItems: 'center',

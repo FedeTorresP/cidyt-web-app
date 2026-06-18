@@ -5,6 +5,23 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.2.2] — 2026-06-17
+
+### Lista de Cubículos — Dashboard de Monitoreo
+
+#### Agregado
+- **Página "Lista de Cubículos"** (`/cubiculo/listado`): dashboard dark-theme full-screen para pantalla TV de enfermeras con grid 7 columnas de cards fijos (150-190px), reloj en tiempo real (5s refresh), leyenda de estatus y timer por sesión activa
+- **Hook `useCubiculosListado()`**: polling cada 30s a `GET /api/cubiculo/listado` con fallback a mock (20 cubículos)
+- **Sistema de alertas por tiempo**: 0-15 min verde, 16-30 min naranja, 31+ min rojo con parpadeo (`animate-cubiculos-pulse`). Color unificado entre timer, borde lateral y dot
+- **Animación `cubiculos-pulse`** en `globals.css` (keyframes + clase utilitaria)
+- **Estilo condicional del hamburguesa** en AppShell: transparente sin fondo en ruta `/cubiculo/listado`
+
+#### Modificado
+- **`globals.css`**: eliminado `margin: 0; padding: 0` del reset `*` (redundante con preflight de Tailwind CSS v4, causaba conflictos de especificidad)
+- **Footer de cubículos**: copyright a la izquierda, leyenda de ocupación a la derecha
+
+---
+
 ## [3.2.1] — 2026-06-17
 
 ### Estudios Externos + Consolidación sap-pipeline
