@@ -37,8 +37,8 @@ const DialogContent = forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-[calc(var(--radius-default)-4px)] p-1 text-[var(--color-texto-suave)] hover:text-[var(--color-texto)] hover:bg-[var(--color-fondo)] transition-colors touch-manipulation">
-        <X className="h-4 w-4" />
+      <DialogPrimitive.Close className="touch-target absolute right-3 top-3 rounded-[calc(var(--radius-default)-4px)] p-2 min-h-[44px] min-w-[44px] text-[var(--color-texto-suave)] hover:text-[var(--color-texto)] hover:bg-[var(--color-fondo)] transition-colors touch-manipulation">
+        <X className="h-5 w-5" />
         <span className="sr-only">Cerrar</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>

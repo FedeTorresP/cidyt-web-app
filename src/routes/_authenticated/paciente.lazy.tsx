@@ -182,7 +182,7 @@ function RegistroPacientesPage() {
               fontWeight: 600,
               fontSize: '0.875rem',
               padding: '0 20px',
-              minHeight: '40px',
+              minHeight: '44px',
               borderRadius: 'var(--radius-default)',
               border: 'none',
               cursor: 'pointer',
@@ -215,7 +215,7 @@ function RegistroPacientesPage() {
                 value={fecha}
                 onChange={(e) => setFecha(e.target.value)}
                 style={{
-                  minHeight: '36px',
+                  minHeight: '44px',
                   padding: '0 12px',
                   fontSize: '0.875rem',
                   borderRadius: '8px',
@@ -438,7 +438,7 @@ function RegistroPacientesPage() {
             fontWeight: 500,
             fontSize: '0.875rem',
             padding: '0 16px',
-            minHeight: '38px',
+            minHeight: '44px',
             borderRadius: 'var(--radius-default)',
             border: '1px solid var(--color-borde)',
             cursor: 'pointer',
@@ -479,7 +479,7 @@ function RegistroPacientesPage() {
                 required
                 value={form.primerNombre}
                 onChange={(e) => updateField('primerNombre', e.target.value)}
-                style={{ width: '100%', minHeight: '38px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem' }}
+                style={{ width: '100%', minHeight: '44px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem' }}
               />
             </div>
 
@@ -492,7 +492,7 @@ function RegistroPacientesPage() {
                 type="text"
                 value={form.segundoNombre}
                 onChange={(e) => updateField('segundoNombre', e.target.value)}
-                style={{ width: '100%', minHeight: '38px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem' }}
+                style={{ width: '100%', minHeight: '44px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem' }}
               />
             </div>
 
@@ -506,7 +506,7 @@ function RegistroPacientesPage() {
                 required
                 value={form.apellidoPaterno}
                 onChange={(e) => updateField('apellidoPaterno', e.target.value)}
-                style={{ width: '100%', minHeight: '38px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem' }}
+                style={{ width: '100%', minHeight: '44px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem' }}
               />
             </div>
 
@@ -519,7 +519,7 @@ function RegistroPacientesPage() {
                 type="text"
                 value={form.apellidoMaterno}
                 onChange={(e) => updateField('apellidoMaterno', e.target.value)}
-                style={{ width: '100%', minHeight: '38px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem' }}
+                style={{ width: '100%', minHeight: '44px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem' }}
               />
             </div>
 
@@ -533,7 +533,7 @@ function RegistroPacientesPage() {
                 required
                 value={form.fechaNac}
                 onChange={(e) => updateField('fechaNac', e.target.value)}
-                style={{ width: '100%', minHeight: '38px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem' }}
+                style={{ width: '100%', minHeight: '44px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem' }}
               />
             </div>
 
@@ -546,7 +546,7 @@ function RegistroPacientesPage() {
                 required
                 value={form.genero}
                 onChange={(e) => updateField('genero', e.target.value)}
-                style={{ width: '100%', minHeight: '38px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem', backgroundColor: '#ffffff' }}
+                style={{ width: '100%', minHeight: '44px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem', backgroundColor: '#ffffff' }}
               >
                 <option value="">-- Seleccionar --</option>
                 <option value="M">Masculino (M)</option>
@@ -563,7 +563,7 @@ function RegistroPacientesPage() {
                 type="text"
                 value={form.historia}
                 onChange={(e) => updateField('historia', e.target.value)}
-                style={{ width: '100%', minHeight: '38px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem' }}
+                style={{ width: '100%', minHeight: '44px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem' }}
               />
             </div>
 
@@ -576,7 +576,7 @@ function RegistroPacientesPage() {
                 required
                 value={form.paqueteId}
                 onChange={(e) => updateField('paqueteId', e.target.value)}
-                style={{ width: '100%', minHeight: '38px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem', backgroundColor: '#ffffff' }}
+                style={{ width: '100%', minHeight: '44px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem', backgroundColor: '#ffffff' }}
               >
                 <option value="">-- Seleccionar --</option>
                 {paquetes.map((p) => (
@@ -594,7 +594,7 @@ function RegistroPacientesPage() {
                 required
                 value={form.empresaId}
                 onChange={(e) => updateField('empresaId', e.target.value)}
-                style={{ width: '100%', minHeight: '38px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem', backgroundColor: '#ffffff' }}
+                style={{ width: '100%', minHeight: '44px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem', backgroundColor: '#ffffff' }}
               >
                 <option value="">-- Seleccionar --</option>
                 {empresas.map((e) => (
@@ -612,7 +612,7 @@ function RegistroPacientesPage() {
                 required
                 value={form.turno}
                 onChange={(e) => updateField('turno', e.target.value)}
-                style={{ width: '100%', minHeight: '38px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem', backgroundColor: '#ffffff' }}
+                style={{ width: '100%', minHeight: '44px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem', backgroundColor: '#ffffff' }}
               >
                 <option value="">-- Seleccionar --</option>
                 {Array.from({ length: 99 }, (_, i) => i + 1).map((n) => (

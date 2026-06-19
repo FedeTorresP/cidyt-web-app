@@ -1,13 +1,15 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { AppShell } from '@/components/layout/AppShell'
-import { getFirebaseAuth } from '@/lib/firebase'
+import { AuthGate } from '@/components/auth/AuthGate'
 
 export const Route = createFileRoute('/_authenticated')({
-  beforeLoad: () => {
-    const auth = getFirebaseAuth()
-    if (!auth.currentUser) {
-      throw redirect({ to: '/login' })
-    }
-  },
-  component: AppShell,
+  component: AuthenticatedLayout,
 })
+
+function AuthenticatedLayout() {
+  return (
+    <AuthGate>
+      <AppShell />
+    </AuthGate>
+  )
+}

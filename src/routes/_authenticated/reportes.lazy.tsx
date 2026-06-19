@@ -1,6 +1,6 @@
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { toast, Toaster } from 'sonner'
+import { toast } from 'sonner'
 import { Download, Loader2 } from 'lucide-react'
 import {
   fetchReporteGeneral,
@@ -148,8 +148,6 @@ function ReportesPage() {
 
   return (
     <div className="max-w-[1100px]">
-      <Toaster position="top-right" richColors closeButton />
-
       <h1 className="text-xl font-bold mb-5">Reportes y Exportaci&oacute;n Excel</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

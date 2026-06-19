@@ -1,5 +1,6 @@
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { useCubiculosListado } from '@/hooks/use-cubiculos'
 import type { CubiculoItem } from '@/hooks/use-cubiculos'
 
@@ -115,7 +116,10 @@ function CubiculoCard({ item }: { item: CubiculoItem }) {
   }
 
   return (
-    <div className={`bg-[#1e293b] rounded-md border-l-[5px] p-2.5 flex flex-col justify-between overflow-hidden hover:bg-[#263548] transition-colors duration-150 h-[190px] ${borderClass}`}>
+    <motion.div
+      whileTap={{ scale: 0.98 }}
+      className={`bg-[#1e293b] rounded-md border-l-[5px] p-2.5 flex flex-col justify-between overflow-hidden hover:bg-[#263548] transition-colors duration-150 h-[190px] ${borderClass}`}
+    >
       
       {/* Header Card */}
       <div className="flex items-center justify-between gap-1.5 shrink-0">
@@ -149,7 +153,7 @@ function CubiculoCard({ item }: { item: CubiculoItem }) {
           </span>
         ) : null}
       </div>
-    </div>
+    </motion.div>
   )
 }
 

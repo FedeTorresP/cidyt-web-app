@@ -5,12 +5,16 @@ import {
   type ColumnDef,
 } from '@tanstack/react-table'
 import { cn } from '@/lib/utils'
+import { TableSkeleton } from '@/components/shared/TableSkeleton'
 
 interface DataTableProps<TData> {
   columns: ColumnDef<TData, unknown>[]
   data: TData[]
   className?: string
   compact?: boolean
+  isLoading?: boolean
+  skeletonRows?: number
+  skeletonCols?: number
 }
 
 /**
@@ -22,12 +26,19 @@ export function DataTable<TData>({
   data,
   className,
   compact = false,
+  isLoading = false,
+  skeletonRows = 6,
+  skeletonCols = 5,
 }: DataTableProps<TData>) {
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
   })
+
+  if (isLoading) {
+    return <TableSkeleton rows={skeletonRows} cols={skeletonCols} className={className} />
+  }
 
   return (
     <div

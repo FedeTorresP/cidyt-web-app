@@ -1,59 +1,74 @@
 import { useState } from 'react'
 import { Outlet, useNavigate, useLocation } from '@tanstack/react-router'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '@/hooks/use-auth'
 import { useMenu } from '@/hooks/use-menu'
+import { useOnline } from '@/hooks/use-online'
 import { logout } from '@/services/auth'
 import { SidebarNav } from './SidebarNav'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { AlertBanner } from '@/components/shared/AlertBanner'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { overlayFade } from '@/lib/motion'
 
 export function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, firebaseUser } = useAuth()
+  const online = useOnline()
   const isCubiculos = location.pathname === '/cubiculo/listado'
   const { data: menuItems, isLoading: menuLoading, error: menuError } = useMenu()
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [logoutOpen, setLogoutOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
 
-  // Derivar nombre de usuario (mayúsculas como legacy)
   const userName = (
     firebaseUser?.displayName ||
     user?.email?.split('@')[0] ||
     'Usuario'
   ).toUpperCase()
 
-  // Turno almacenado en sessionStorage desde el login
   const turno = typeof window !== 'undefined'
     ? sessionStorage.getItem('cidyt_turno')
     : null
 
-  const handleLogout = async () => {
+  const handleLogoutConfirm = async () => {
+    setLoggingOut(true)
     try {
       await logout()
     } finally {
       sessionStorage.removeItem('cidyt_turno')
+      setLogoutOpen(false)
       navigate({ to: '/login' })
     }
   }
 
   return (
     <div className="flex flex-row" style={{ minHeight: '100dvh' }}>
-      {/* Overlay (portrait / mobile) */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-[199] lg:hidden"
-          style={{ backgroundColor: 'rgba(10,31,92,0.4)' }}
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            key="sidebar-overlay"
+            className="fixed inset-0 z-[199] lg:hidden"
+            style={{ backgroundColor: 'rgba(10,31,92,0.4)' }}
+            variants={overlayFade}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Sidebar */}
-      <aside
-        className={[
-          'fixed top-0 left-0 z-[200] flex flex-col overflow-hidden',
-          'transition-transform duration-[250ms] ease-in-out',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-        ].join(' ')}
+      <motion.aside
+        className="fixed top-0 left-0 z-[200] flex flex-col overflow-hidden"
         style={{
           width: 200,
           minWidth: 200,
@@ -61,10 +76,12 @@ export function AppShell() {
           backgroundColor: 'var(--color-primario)',
           overflowY: 'auto',
           overflowX: 'hidden',
+          paddingBottom: 'env(safe-area-inset-bottom)',
         }}
+        animate={{ x: sidebarOpen ? 0 : -200 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
         aria-label="Panel de navegación"
       >
-        {/* Nav content */}
         {menuLoading ? (
           <div className="flex items-center justify-center py-6 flex-1">
             <LoadingSpinner size="sm" className="border-white/30 border-t-white" />
@@ -81,16 +98,15 @@ export function AppShell() {
           />
         )}
 
-        {/* Footer: Botón Salir */}
         <div
           className="shrink-0"
           style={{
-            padding: '8px 12px 10px',
+            padding: '8px 12px calc(10px + env(safe-area-inset-bottom))',
             borderTop: '1px solid rgba(255,255,255,0.1)',
           }}
         >
-          <button
-            onClick={handleLogout}
+          <motion.button
+            onClick={() => setLogoutOpen(true)}
             className="flex items-center justify-center gap-2 w-full"
             style={{
               minHeight: 44,
@@ -102,11 +118,10 @@ export function AppShell() {
               fontSize: '0.8125rem',
               fontWeight: 500,
               touchAction: 'manipulation',
-              transition: 'background-color 0.2s ease',
             }}
+            whileTap={{ scale: 0.97 }}
             aria-label="Cerrar sesión"
           >
-            {/* Ícono de salida (logout arrow) */}
             <svg
               width="16"
               height="16"
@@ -123,32 +138,43 @@ export function AppShell() {
               <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
             <span>Salir</span>
-          </button>
+          </motion.button>
         </div>
-      </aside>
+      </motion.aside>
 
-      {/* Main content */}
       <main
         className="flex-1 flex flex-col bg-[var(--color-fondo)] transition-[margin-left] duration-[250ms] ease-in-out"
         style={{
           minHeight: '100dvh',
           marginLeft: sidebarOpen ? 200 : 0,
+          paddingTop: 'env(safe-area-inset-top)',
         }}
       >
-        {/* Hamburger toggle — fixed */}
-        <button
+        {!online && (
+          <div
+            className="text-center text-xs font-semibold text-white shrink-0"
+            style={{
+              backgroundColor: 'var(--color-warning)',
+              padding: '6px 12px',
+            }}
+          >
+            Sin conexión — los cambios se sincronizarán al reconectar
+          </div>
+        )}
+
+        <motion.button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           style={{
             position: 'fixed',
-            top: 8,
+            top: 'calc(8px + env(safe-area-inset-top))',
             left: sidebarOpen ? 164 : 8,
             zIndex: 201,
-            width: 36,
-            height: 36,
-            minHeight: 36,
-            maxHeight: 36,
-            minWidth: 36,
-            maxWidth: 36,
+            width: 44,
+            height: 44,
+            minHeight: 44,
+            maxHeight: 44,
+            minWidth: 44,
+            maxWidth: 44,
             padding: 0,
             backgroundColor: isCubiculos ? 'transparent' : 'var(--color-primario)',
             color: isCubiculos ? '#e2e8f0' : '#fff',
@@ -159,9 +185,11 @@ export function AppShell() {
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            transition: 'left 0.25s ease',
             boxShadow: 'none',
           }}
+          whileTap={{ scale: 0.93 }}
+          animate={{ left: sidebarOpen ? 164 : 8 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
           aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
           aria-expanded={sidebarOpen}
         >
@@ -179,17 +207,42 @@ export function AppShell() {
               <line x1="4" y1="18" x2="20" y2="18" />
             </svg>
           )}
-        </button>
+        </motion.button>
 
-        <div className="flex-1" style={{ padding: sidebarOpen ? '12px 24px 24px 24px' : '12px 24px 24px 50px' }}>
+        <div
+          className="flex-1"
+          style={{
+            padding: sidebarOpen
+              ? '12px 24px calc(24px + env(safe-area-inset-bottom)) 24px'
+              : '12px 24px calc(24px + env(safe-area-inset-bottom)) 50px',
+          }}
+        >
           <Outlet />
         </div>
 
-        {/* Footer corporativo */}
         <footer className="text-center text-[11px] text-[var(--color-texto-suave)] py-6 mt-auto">
           Desarrollado por: Médica Sur – Sistemas y T.I. · Copyright © {new Date().getFullYear()}. All rights reserved.
         </footer>
       </main>
+
+      <Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>¿Cerrar sesión?</DialogTitle>
+            <DialogDescription>
+              Se cerrará tu sesión en IPadCIDyT. Deberás volver a iniciar sesión para continuar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 justify-end mt-2">
+            <Button variant="outline" onClick={() => setLogoutOpen(false)} disabled={loggingOut}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleLogoutConfirm} disabled={loggingOut}>
+              {loggingOut ? 'Saliendo...' : 'Cerrar sesión'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

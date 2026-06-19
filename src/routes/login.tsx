@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useRef } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { loginWithEmail, logout, GENERIC_AUTH_ERROR } from '@/services/auth'
 import { useAuth } from '@/hooks/use-auth'
 import { AlertBanner } from '@/components/shared/AlertBanner'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
+import { pageSlide } from '@/lib/motion'
 
 export const Route = createFileRoute('/login')({
   component: LoginPage,
@@ -62,6 +64,7 @@ function LoginPage() {
   const { user } = useAuth()
 
   const [step, setStep] = useState<LoginStep>('credentials')
+  const [direction, setDirection] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState('')
@@ -92,6 +95,7 @@ function LoginPage() {
       const fbUser = await loginWithEmail(username, password)
       const name = fbUser.displayName || fbUser.email?.split('@')[0] || 'Usuario'
       setDisplayName(name.toUpperCase())
+      setDirection(1)
       setStep('schedule')
     } catch (err) {
       console.error('[Login] Error de autenticación:', err)
@@ -104,6 +108,7 @@ function LoginPage() {
 
   async function handleBack() {
     await logout()
+    setDirection(-1)
     setStep('credentials')
     setSelectedTurno(null)
     setError(null)
@@ -126,6 +131,10 @@ function LoginPage() {
       style={{
         minHeight: '100dvh',
         background: 'linear-gradient(135deg, #0A1F5C 0%, #0d2870 100%)',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
       }}
     >
       <div
@@ -155,10 +164,17 @@ function LoginPage() {
         </div>
 
         {/* ═══ Cuerpo de la Card ═══ */}
-        <div style={{ padding: '32px 28px 36px' }}>
-          {step === 'credentials' ? (
-            /* ─── PASO 1: Credenciales ─── */
-            <>
+        <div style={{ padding: '32px 28px 36px', overflow: 'hidden', position: 'relative', minHeight: 280 }}>
+          <AnimatePresence mode="wait" custom={direction}>
+            {step === 'credentials' ? (
+              <motion.div
+                key="credentials"
+                custom={direction}
+                variants={pageSlide}
+                initial="enter"
+                animate="center"
+                exit="exit"
+              >
               {error && (
                 <AlertBanner variant="error" className="mb-5">
                   {error}
@@ -232,9 +248,16 @@ function LoginPage() {
                   )}
                 </button>
               </form>
-            </>
-          ) : (
-            /* ─── PASO 2: Selección de Horario ─── */
+              </motion.div>
+            ) : (
+              <motion.div
+                key="schedule"
+                custom={direction}
+                variants={pageSlide}
+                initial="enter"
+                animate="center"
+                exit="exit"
+              >
             <div>
               <p className="text-[14px]" style={{ color: 'var(--color-texto-suave)' }}>
                 Bienvenido,{' '}
@@ -316,7 +339,9 @@ function LoginPage() {
                 </button>
               </div>
             </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>
@@ -326,6 +351,7 @@ function LoginPage() {
 /* ═══════════════════════════════════════════════════════════════════════════
    Sub-componente: TurnoCard (Radio visual accesible)
    ═══════════════════════════════════════════════════════════════════════════ */
+
 
 function TurnoCard({
   turno,
@@ -339,12 +365,13 @@ function TurnoCard({
   onSelect: () => void
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       role="radio"
       aria-checked={selected}
       aria-label={`Turno ${turno.toLowerCase()}`}
       onClick={onSelect}
+      whileTap={{ scale: 0.98 }}
       className="w-full flex items-center gap-3 text-left"
       style={{
         minHeight: 48,
@@ -390,6 +417,6 @@ function TurnoCard({
 
       <span aria-hidden="true">{emoji}</span>
       <span>{turno}</span>
-    </button>
+    </motion.button>
   )
 }

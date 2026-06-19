@@ -33,6 +33,12 @@
   --shadow-card: 0 2px 12px rgba(10, 31, 92, 0.08);
   --shadow-hover: 0 6px 24px rgba(10, 31, 92, 0.14);
   --transition-default: 0.2s ease;
+
+  /* Motion tokens */
+  --motion-duration-fast: 150ms;
+  --motion-duration-normal: 250ms;
+  --motion-duration-slow: 350ms;
+  --motion-spring: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 /* --------------------------------------------------------------------------
@@ -65,6 +71,10 @@ body {
   overflow-x: hidden;
   min-height: 100vh;
   min-height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* --------------------------------------------------------------------------
@@ -80,7 +90,7 @@ textarea {
   background-color: var(--color-blanco);
   border: 1px solid var(--color-borde);
   border-radius: var(--radius-default);
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 10px;
   outline: none;
   transition: border-color var(--transition-default), box-shadow var(--transition-default);
@@ -93,8 +103,8 @@ input[type="datetime-local"] {
   -webkit-appearance: none;
   appearance: none;
   text-align: left;
-  min-height: 38px;
-  line-height: 38px;
+  min-height: 44px;
+  line-height: 44px;
   padding: 0 10px;
 }
 
@@ -131,9 +141,9 @@ button {
   cursor: pointer;
   border: none;
   border-radius: var(--radius-default);
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 16px;
-  transition: background-color var(--transition-default), box-shadow var(--transition-default), opacity var(--transition-default);
+  transition: background-color var(--transition-default), box-shadow var(--transition-default), opacity var(--transition-default), transform var(--motion-duration-fast) var(--motion-spring);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -144,6 +154,64 @@ button {
 button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-primario);
+  outline-offset: 2px;
+}
+
+/* Hit-slop invisible para iconos pequeños (Apple HIG 44pt) */
+.touch-target {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+.touch-target::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+/* Radix/shadcn enter animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-in {
+  animation-duration: var(--motion-duration-normal);
+  animation-fill-mode: both;
+  animation-timing-function: var(--motion-spring);
+}
+
+.fade-in-0 { animation-name: fadeIn; }
+.zoom-in-95 { animation-name: zoomIn; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  button:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 /* --------------------------------------------------------------------------

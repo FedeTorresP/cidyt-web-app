@@ -1,5 +1,6 @@
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   useCajaDetalle,
@@ -154,10 +155,6 @@ function CajaDetallePage() {
   const [form, setForm] = useState<FacturaFormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  // Feedback banners
-  const [successMsg, setSuccessMsg] = useState<string | null>(null)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-
   // Auto-load first factura on initial mount
   const didAutoLoad = useRef(false)
   useEffect(() => {
@@ -169,28 +166,12 @@ function CajaDetallePage() {
     }
   }, [data])
 
-  // Clear messages after timeout
-  useEffect(() => {
-    if (successMsg) {
-      const t = setTimeout(() => setSuccessMsg(null), 4000)
-      return () => clearTimeout(t)
-    }
-  }, [successMsg])
-  useEffect(() => {
-    if (errorMsg) {
-      const t = setTimeout(() => setErrorMsg(null), 5000)
-      return () => clearTimeout(t)
-    }
-  }, [errorMsg])
-
   // Handlers
   const updateField = useCallback(<K extends keyof FacturaFormState>(key: K, value: FacturaFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
   }, [])
 
   const handleGuardar = useCallback(async () => {
-    setErrorMsg(null)
-    setSuccessMsg(null)
     try {
       await guardarFactura.mutateAsync({
         seguimientoId,
@@ -205,11 +186,11 @@ function CajaDetallePage() {
         descripcion1: form.descripcion1 || null,
         observaciones: form.observaciones || null,
       })
-      setSuccessMsg(form.facturaId ? 'Factura actualizada exitosamente.' : 'Factura guardada exitosamente.')
+      toast.success(form.facturaId ? 'Factura actualizada exitosamente.' : 'Factura guardada exitosamente.')
       setForm(EMPTY_FORM)
       setEditingId(null)
     } catch {
-      setErrorMsg('Error al guardar la factura. Intente nuevamente.')
+      toast.error('Error al guardar la factura. Intente nuevamente.')
     }
   }, [form, seguimientoId, guardarFactura])
 
@@ -226,27 +207,25 @@ function CajaDetallePage() {
 
   const handleEliminar = useCallback(async (facturaId: string) => {
     if (!confirm('¿Está seguro que desea eliminar esta factura?')) return
-    setErrorMsg(null)
     try {
       await eliminarFactura.mutateAsync({ seguimientoId, facturaId })
-      setSuccessMsg('Factura eliminada.')
+      toast.success('Factura eliminada.')
       if (editingId === facturaId) {
         setForm(EMPTY_FORM)
         setEditingId(null)
       }
     } catch {
-      setErrorMsg('Error al eliminar la factura.')
+      toast.error('Error al eliminar la factura.')
     }
   }, [seguimientoId, eliminarFactura, editingId])
 
   const handleConfirmarEgreso = useCallback(async () => {
     if (!confirm('¿Confirmar el retiro del paciente? Esta acción no se puede deshacer.')) return
-    setErrorMsg(null)
     try {
       await confirmarEgreso.mutateAsync({ seguimientoId })
-      setSuccessMsg('Paciente egresado exitosamente.')
+      toast.success('Paciente egresado exitosamente.')
     } catch {
-      setErrorMsg('Error al confirmar egreso.')
+      toast.error('Error al confirmar egreso.')
     }
   }, [seguimientoId, confirmarEgreso])
 
@@ -278,18 +257,6 @@ function CajaDetallePage() {
       <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
         Paciente: <strong style={{ color: '#1f2937' }}>{seg.nombre}</strong> | Seguimiento #{seg.seguimientoId}
       </p>
-
-      {/* ── Feedback Banners ── */}
-      {successMsg && (
-        <div role="status" style={{ padding: '0.75rem 1rem', marginBottom: '1rem', borderRadius: '6px', backgroundColor: '#f0fdf4', border: '1px solid #86efac', color: '#166534', fontSize: '0.85rem', fontWeight: 500 }}>
-          {successMsg}
-        </div>
-      )}
-      {errorMsg && (
-        <div role="alert" style={{ padding: '0.75rem 1rem', marginBottom: '1rem', borderRadius: '6px', backgroundColor: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', fontSize: '0.85rem', fontWeight: 500 }}>
-          {errorMsg}
-        </div>
-      )}
 
       {/* ═══════════════════════════════════════════════════════════════════
          SECCIÓN: Información del Paciente
@@ -432,7 +399,8 @@ function CajaDetallePage() {
           {editingId && (
             <button
               onClick={handleCancelEdit}
-              style={{ backgroundColor: '#6b7280', color: '#fff', fontWeight: 600, borderRadius: '4px', padding: '0.5rem 1.25rem', fontSize: '0.875rem', border: 'none', cursor: 'pointer' }}
+              className="touch-manipulation"
+              style={{ backgroundColor: '#6b7280', color: '#fff', fontWeight: 600, borderRadius: '4px', padding: '0.5rem 1.25rem', fontSize: '0.875rem', border: 'none', cursor: 'pointer', minHeight: '44px' }}
             >
               Cancelar
             </button>

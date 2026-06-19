@@ -1,6 +1,17 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Sheet } from '@/components/ui/sheet'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Pressable } from '@/components/ui/pressable'
+import { hapticFeedback } from '@/lib/motion'
 import { nowMX, formatDateMX } from '@/lib/timezone'
 import { useListaDia, useUpdatePacienteCache } from '@/hooks/use-lista-dia'
 import type { PacienteListaDia } from '@/hooks/use-lista-dia'
@@ -75,9 +86,11 @@ const LEYENDA = [
 
 function ModalDatosPaciente({
   paciente,
+  open,
   onClose,
 }: {
   paciente: PacienteListaDia
+  open: boolean
   onClose: () => void
 }) {
   const desayunoOpt = DESAYUNO_OPCIONES.find((d) => d.value === paciente.desayuno)
@@ -105,27 +118,7 @@ function ModalDatosPaciente({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
-      <div
-        className="bg-[var(--color-fondo-card)] rounded-xl shadow-xl w-[90vw] max-w-[580px] max-h-[85vh] overflow-y-auto relative"
-        style={{ padding: '24px' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between" style={{ marginBottom: '8px' }}>
-          <h2 className="text-[0.9rem] font-semibold text-[var(--color-texto)]">Datos del Paciente</h2>
-          <button
-            onClick={onClose}
-            className="text-[var(--color-texto-suave)] hover:text-[var(--color-texto)] text-xl leading-none p-1"
-            aria-label="Cerrar"
-          >
-            ✕
-          </button>
-        </div>
-
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()} title="Datos del Paciente">
         <h3 className="text-[1.15rem] font-bold text-[var(--color-texto)]" style={{ marginBottom: '20px' }}>{paciente.nombre}</h3>
 
         {/* Fila 1: ID Paquete (20%) | Paquete (60%) | Desayuno (20%) */}
@@ -208,12 +201,121 @@ function ModalDatosPaciente({
           </p>
         </div>
 
-        {/* Botón cerrar */}
         <div style={{ borderTop: '1px solid var(--color-borde)', paddingTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-          <Button size="sm" onClick={onClose}>Cerrar</Button>
+          <Button onClick={onClose}>Cerrar</Button>
         </div>
-      </div>
-    </div>
+    </Sheet>
+  )
+}
+
+type EstatusOption = (typeof ESTATUS_ESTUDIO)[number]
+
+function EstatusCellPicker({
+  value,
+  options,
+  label,
+  onChange,
+}: {
+  value: number
+  options: readonly EstatusOption[]
+  label: string
+  onChange: (id: number) => void
+}) {
+  const estatus = options.find((e) => e.id === value) ?? options[0]
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Pressable
+          className="estatus-cell"
+          style={{
+            width: 36,
+            height: 36,
+            minWidth: 36,
+            minHeight: 36,
+            backgroundColor: estatus.esBorde ? 'transparent' : estatus.color,
+            border: estatus.esBorde ? '1.5px solid #d1d5db' : 'none',
+            color: estatus.esBorde ? 'transparent' : '#ffffff',
+            fontSize: '0.65rem',
+          }}
+          aria-label={`${label}: ${estatus.nombre}`}
+        >
+          {estatus.letra}
+        </Pressable>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="center">
+        {options.map((opt) => (
+          <DropdownMenuItem
+            key={opt.id}
+            onClick={() => {
+              onChange(opt.id)
+              hapticFeedback()
+              toast.success(`${label}: ${opt.nombre}`)
+            }}
+          >
+            <span
+              style={{
+                width: 14,
+                height: 14,
+                borderRadius: 3,
+                backgroundColor: opt.esBorde ? 'transparent' : opt.color,
+                border: opt.esBorde ? '1.5px solid #d1d5db' : 'none',
+                flexShrink: 0,
+              }}
+            />
+            {opt.nombre}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function DesayunoPicker({
+  value,
+  onChange,
+}: {
+  value: 0 | 1 | 2
+  onChange: (v: 0 | 1 | 2) => void
+}) {
+  const opt = DESAYUNO_OPCIONES.find((d) => d.value === value)
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Pressable
+          className="touch-target"
+          style={{
+            backgroundColor: opt?.color ?? '#666',
+            color: value === 1 ? '#1a1a1a' : '#ffffff',
+            fontSize: '0.65rem',
+            fontWeight: 700,
+            width: 50,
+            height: 32,
+            minHeight: 32,
+            borderRadius: 4,
+          }}
+          aria-label="Desayuno"
+        >
+          {opt?.label ?? '—'}
+        </Pressable>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="center">
+        {DESAYUNO_OPCIONES.map((o) => (
+          <DropdownMenuItem
+            key={o.value}
+            onClick={() => {
+              onChange(o.value as 0 | 1 | 2)
+              hapticFeedback()
+              toast.success(`Desayuno: ${o.label}`)
+            }}
+          >
+            <span style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: o.color }} />
+            {o.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -280,11 +382,11 @@ function ListaDiaPage() {
           type="date"
           value={fecha}
           onChange={(e) => handleFechaChange(e.target.value)}
-          style={{ width: '160px', minHeight: '38px', height: '38px', fontSize: '0.875rem', padding: '0 10px', border: '1px solid var(--color-borde)', borderRadius: '8px', backgroundColor: 'var(--color-fondo-card)', color: 'var(--color-texto)', flexShrink: 0 }}
+          style={{ width: '160px', minHeight: '44px', height: '44px', fontSize: '0.875rem', padding: '0 10px', border: '1px solid var(--color-borde)', borderRadius: '8px', backgroundColor: 'var(--color-fondo-card)', color: 'var(--color-texto)', flexShrink: 0 }}
         />
         <button
           onClick={handleActualizar}
-          style={{ flexShrink: 0, minHeight: '38px', padding: '0 16px', fontWeight: 600, fontSize: '0.875rem', color: '#ffffff', backgroundColor: '#0b2340', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
+          style={{ flexShrink: 0, minHeight: '44px', padding: '0 16px', fontWeight: 600, fontSize: '0.875rem', color: '#ffffff', backgroundColor: '#0b2340', borderRadius: '8px', border: 'none', cursor: 'pointer', touchAction: 'manipulation' }}
         >
           ↻ Actualizar
         </button>
@@ -408,37 +510,10 @@ function ListaDiaPage() {
                     </td>
                     {/* Desayuno — pill badge */}
                     <td className="px-0 py-[4px] text-center border-b border-b-[var(--color-borde)] align-middle">
-                      <div className="relative inline-flex items-center justify-center">
-                        <select
-                          value={pac.desayuno}
-                          onChange={(e) => handleDesayunoChange(pac.seguimientoId, Number(e.target.value) as 0 | 1 | 2)}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-[1]"
-                          aria-label="Desayuno"
-                        >
-                          {DESAYUNO_OPCIONES.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
-                        <span
-                          className="select-none pointer-events-none"
-                          style={{
-                            backgroundColor: DESAYUNO_OPCIONES.find((d) => d.value === pac.desayuno)?.color ?? '#666',
-                            color: pac.desayuno === 1 ? '#1a1a1a' : '#ffffff',
-                            fontSize: '0.6rem',
-                            fontWeight: 700,
-                            width: '50px',
-                            height: '22px',
-                            borderRadius: '4px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {DESAYUNO_OPCIONES.find((d) => d.value === pac.desayuno)?.label ?? '—'}
-                        </span>
-                      </div>
+                      <DesayunoPicker
+                        value={pac.desayuno}
+                        onChange={(v) => handleDesayunoChange(pac.seguimientoId, v)}
+                      />
                     </td>
 
                     {/* Celdas de estudios — cuadros sólidos con letra */}
@@ -450,48 +525,36 @@ function ListaDiaPage() {
                           key={est.id}
                           style={{ padding: '2px', textAlign: 'center', borderBottom: '1px solid var(--color-borde)', verticalAlign: 'middle' }}
                         >
-                          <div className="relative" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', margin: '0 auto' }}>
-                            <select
-                              value={estatusId}
-                              onChange={(e) => handleEstudioChange(pac.seguimientoId, est.id, Number(e.target.value))}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-[1]"
-                              title={`${est.nombre}: ${estatus.nombre}`}
-                              aria-label={`${est.nombre}: ${estatus.nombre}`}
-                            >
-                              {ESTATUS_ESTUDIO.map((s) => (
-                                <option key={s.id} value={s.id}>{s.nombre}</option>
-                              ))}
-                            </select>
-                            <span
-                              className="flex items-center justify-center w-[28px] h-[28px] text-[0.6rem] font-bold select-none pointer-events-none"
-                              style={{
-                                backgroundColor: estatus.esBorde ? 'transparent' : estatus.color,
-                                border: estatus.esBorde ? '1.5px solid #d1d5db' : 'none',
-                                borderRadius: '4px',
-                                color: estatus.esBorde ? 'transparent' : '#ffffff',
-                              }}
-                            >
-                              {estatus.letra}
-                            </span>
-                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+                                <EstatusCellPicker
+                                  value={estatusId}
+                                  options={ESTATUS_ESTUDIO}
+                                  label={est.nombre}
+                                  onChange={(id) => handleEstudioChange(pac.seguimientoId, est.id, id)}
+                                />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>{`${est.nombre}: ${estatus.nombre}`}</TooltipContent>
+                          </Tooltip>
                         </td>
                       )
                     })}
 
                     {/* Obs — botón ojo → modal */}
                     <td style={{ padding: '2px 2px', borderBottom: '1px solid var(--color-borde)', textAlign: 'center', verticalAlign: 'middle', overflow: 'visible' }}>
-                      <button
+                      <Pressable
                         onClick={() => setModalPaciente(pac)}
-                        className={pac.tieneAdicionales ? 'animate-[obsPulse_2s_ease-in-out_1]' : ''}
-                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '24px', minHeight: '24px', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
-                        title={pac.tieneAdicionales ? 'Estudios adicionales — ver datos' : 'Ver datos del paciente'}
+                        className={`touch-target ${pac.tieneAdicionales ? 'animate-[obsPulse_2s_ease-in-out_1]' : ''}`}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
                         aria-label={`Ver datos de ${pac.nombre}`}
                       >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke={pac.tieneAdicionales ? '#FF8C00' : '#0b2340'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                           <circle cx="12" cy="12" r="3" stroke={pac.tieneAdicionales ? '#FF8C00' : '#0b2340'} strokeWidth="1.5" />
                         </svg>
-                      </button>
+                      </Pressable>
                     </td>
 
                     {/* Médico Internista */}
@@ -504,10 +567,10 @@ function ListaDiaPage() {
                       <Link
                         to="/paciente/$seguimientoId"
                         params={{ seguimientoId: pac.seguimientoId }}
-                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '24px', minHeight: '24px' }}
+                        className="touch-target inline-flex items-center justify-center"
                         title={`Detalle seguimiento #${pac.seguimientoId}`}
                       >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="#0b2340" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="#0b2340" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
@@ -523,7 +586,11 @@ function ListaDiaPage() {
 
       {/* Modal Datos del Paciente */}
       {modalPaciente && (
-        <ModalDatosPaciente paciente={modalPaciente} onClose={() => setModalPaciente(null)} />
+        <ModalDatosPaciente
+          paciente={modalPaciente}
+          open={!!modalPaciente}
+          onClose={() => setModalPaciente(null)}
+        />
       )}
     </div>
   )

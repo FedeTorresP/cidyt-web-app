@@ -30,7 +30,7 @@ const DropdownMenuItem = forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex cursor-pointer select-none items-center gap-2 rounded-[calc(var(--radius-default)-4px)] px-3 py-2 text-[13px] font-medium outline-none transition-colors min-h-[38px] touch-manipulation',
+      'relative flex cursor-pointer select-none items-center gap-2 rounded-[calc(var(--radius-default)-4px)] px-3 py-2 text-[13px] font-medium outline-none transition-colors min-h-[44px] touch-manipulation',
       destructive
         ? 'text-[var(--color-error)] focus:bg-[var(--color-error)]/8'
         : 'text-[var(--color-texto)] focus:bg-[var(--color-fondo)] hover:bg-[var(--color-fondo)]',

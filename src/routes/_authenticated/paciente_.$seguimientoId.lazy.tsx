@@ -1,5 +1,6 @@
 import { createLazyFileRoute, useRouter } from '@tanstack/react-router'
 import { useState, useCallback, useEffect } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { useUpdatePacienteCache } from '@/hooks/use-lista-dia'
@@ -198,34 +199,6 @@ const ESTUDIOS_PAQUETE = [
 ] as const
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   TOAST SIMPLE (sin dependencia externa)
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function showToast(message: string, type: 'success' | 'error' = 'success') {
-  const el = document.createElement('div')
-  el.textContent = message
-  Object.assign(el.style, {
-    position: 'fixed',
-    bottom: '24px',
-    right: '24px',
-    zIndex: '9999',
-    padding: '12px 20px',
-    borderRadius: '8px',
-    fontSize: '0.85rem',
-    fontWeight: '600',
-    color: '#fff',
-    backgroundColor: type === 'success' ? '#00A651' : '#D32F2F',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    transition: 'opacity 0.3s',
-  })
-  document.body.appendChild(el)
-  setTimeout(() => {
-    el.style.opacity = '0'
-    setTimeout(() => el.remove(), 300)
-  }, 3000)
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -331,13 +304,13 @@ function SeguimientoPacientePage() {
         body: JSON.stringify(body),
       })
       if (res.ok) {
-        showToast('Seguimiento guardado exitosamente', 'success')
+        toast.success('Seguimiento guardado exitosamente')
         setTimeout(() => router.history.back(), 1500)
       } else {
-        showToast('Error al guardar seguimiento', 'error')
+        toast.error('Error al guardar seguimiento')
       }
     } catch {
-      showToast('Error de conexión', 'error')
+      toast.error('Error de conexión')
     }
     setSaving(false)
   }, [seguimientoId, desayuno, padecimientoId, medicoId, estatusValpac, fechaEntrega, horaEntrega, entregados, enviar, fechaEnvio, horaEnvio, observaciones, peso, talla, router])
@@ -370,7 +343,7 @@ function SeguimientoPacientePage() {
         const created = await res.json()
         setEstudios((prev) => [...prev, { ...created, Activo: 1, Estudio_id: 100 }])
         setNuevoNombre('')
-        showToast('Estudio adicional agregado', 'success')
+        toast.success('Estudio adicional agregado')
       }
     } catch {
       // Optimistic add for mock
@@ -386,7 +359,7 @@ function SeguimientoPacientePage() {
         Activo: 1,
       }])
       setNuevoNombre('')
-      showToast('Estudio adicional agregado (local)', 'success')
+      toast.success('Estudio adicional agregado (local)')
     }
   }, [seguimientoId, nuevaLetra, nuevoNombre])
 

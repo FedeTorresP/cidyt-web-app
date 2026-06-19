@@ -12,13 +12,13 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png', 'apple-touch-icon.png', 'LogoMS1.svg'],
+      includeAssets: ['favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png', 'apple-touch-icon.png', 'icon-512.png', 'LogoMS1.svg'],
       manifest: {
         name: 'IPadCIDyT — Plataforma de Diagnóstico y Consulta Médica',
         short_name: 'IPadCIDyT',
         description: 'Plataforma Core de Diagnóstico y Consulta Médica',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
+        theme_color: '#0A1F5C',
+        background_color: '#0A1F5C',
         display: 'standalone',
         start_url: '/',
         scope: '/',
@@ -37,6 +37,18 @@ export default defineConfig({
             src: '/apple-touch-icon.png',
             sizes: '180x180',
             type: 'image/png',
+          },
+          {
+            src: '/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
           },
           {
             src: '/LogoMS1.svg',
