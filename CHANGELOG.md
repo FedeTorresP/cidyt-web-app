@@ -5,12 +5,39 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.3.0] — 2026-06-19
+
+### PWA + Seed de Catálogos Firestore
+
+#### Agregado
+- **Progressive Web App (PWA)**: integración de `vite-plugin-pwa` con service worker auto-update, Web App Manifest inline y soporte offline-first
+  - Manifest: `IPadCIDyT` como nombre corto, display `standalone`, iconos (favicon 16/32, apple-touch-icon 180, LogoMS1.svg maskable)
+  - Workbox: precache de assets estáticos (`*.js, *.css, *.html, *.ico, *.png, *.svg, *.woff2`), runtime caching `NetworkFirst` para Firestore API, `NetworkOnly` para Identity Toolkit (auth)
+  - Type reference `vite-plugin-pwa/client` en `vite-env.d.ts`
+- **Script `scripts/seed-catalogos.mjs`**: herramienta CLI para poblar catálogos en Firestore desde JSONs exportados de la BD legacy (IPADCK)
+  - Soporta autenticación vía: service-account.json, env var `FIREBASE_SERVICE_ACCOUNT_KEY`, o **Google Cloud CLI (gcloud ADC)**
+  - Flags: `--dry-run` (simula sin escribir), `--collection=X` (sube solo una colección)
+  - Batched writes (450 docs/lote) para colecciones grandes (empresas, paquetes, paquete_detalle)
+  - Transformadores por colección que mapean campos IPADCK → esquema Firestore normalizado
+  - Sanitización de IDs con `/` (Firestore no los permite) conservando ID original en campo separado
+- **18 colecciones de catálogos** subidas a Firestore (~10,463 documentos):
+  - Inline: `estudios` (21 con mapeo `lugarEstudioId`), `estudio_tipo` (2), `estatus_estudio` (9), `estatus_cubiculo_medico` (5), `estatus_val_pac` (4), `especialidades` (13), `lugar_estudio` (13), `padecimientos` (3), `horarios` (2)
+  - Desde JSON: `empresas` (1,477), `medicos` (210 con campo `letra`), `cubiculos` (28), `paquetes` (650), `promotores` (35), `perfiles` (8)
+  - Tablas puente: `medico_especialidad` (192), `medico_lugar_estudio` (208), `paquete_detalle` (7,591)
+- **Campo `lugarEstudioId`** en colección `estudios`: vincula cada estudio con el área/rama donde se realiza (Nutrición→1, Dental→8, Oftalmología→9, etc.) — base para el feature de asignación de médicos por estudio
+- **Campo `letra`** en colección `medicos`: letra identificadora del médico para mostrar en la matriz de estudios
+- **Carpeta `scripts/data/`** con `.gitignore` para JSONs exportados de IPADCK (no se versionan)
+- **Dependencia `firebase-admin@14.0.0`** como devDependency para el script de seed
+
+#### Modificado
+- **`vite.config.ts`**: agregado plugin `VitePWA` con configuración completa de manifest y workbox
+- **`vite-env.d.ts`**: agregada referencia de tipos `vite-plugin-pwa/client`
+
+---
+
 ## [3.2.2] — 2026-06-18 [`35a30e0`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/35a30e0)
 
 ### Optimización de densidad vertical para iPad — Lista de Pacientes & Lista de Estudios Caja
-
-#### Modificado
-- **Lista de Pacientes** (`/lista-dia`): reducir padding vertical en toolbar (10→6px), leyenda (12→6px), headers (py-4→py-1.5), filas (py-14→py-4), cuadros de estudio (28→22px), badge desayuno (57×28→50×22). Agregar sticky thead dinámico debajo del toolbar con ResizeObserver. Redistribuir ancho Médico Internista (80→100px) / Vínculos (60→40px). Agrandar ícono padecimiento (10→16px) con margen derecho
 - **Lista de Estudios — Caja** (`/lista-caja`): misma compactación de toolbar, headers y filas. Badges de Desayuno/Tarjeta cambiados de cuadrados sólidos a texto coloreado (legacy style). Celdas de estudio sin padding (0px). Header color corregido a `var(--color-primario)`. Sticky thead dinámico debajo del toolbar
 - **`globals.css`**: `h1.page-title` margin-bottom reducido de 16px a 6px
 

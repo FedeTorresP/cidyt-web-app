@@ -27,6 +27,7 @@ Gestiona el flujo completo del paciente: admisión, asignación de cubículos, s
 | Auth + DB | Firebase Client SDK (Auth + Firestore) | 11.10 |
 | Tipos | TypeScript | 5.8 |
 | Iconos | Lucide React | — |
+| PWA | vite-plugin-pwa (Workbox) | 1.3 |
 
 ---
 
@@ -82,6 +83,15 @@ Disponible en `http://localhost:5173`
 | `npm run preview` | Preview local del build |
 | `npm run typecheck` | Verificación de tipos |
 | `npm run lint` | ESLint |
+
+### Scripts de administración
+
+| Comando | Descripción |
+|---------|-------------|
+| `node scripts/create-admin.mjs` | Crea el super usuario admin en Firebase Auth |
+| `node scripts/seed-catalogos.mjs` | Sube catálogos a Firestore (requiere gcloud auth) |
+| `node scripts/seed-catalogos.mjs --dry-run` | Simula el seed sin escribir en Firestore |
+| `node scripts/seed-catalogos.mjs --collection=X` | Sube solo la colección indicada |
 
 ---
 
@@ -157,6 +167,19 @@ El deploy es automático al hacer push a `main`:
 - **Secretos:** GCP Secret Manager
 - **IaC:** Terraform (directorio `terraform/`)
 - **Logging:** Cloud Logging (pipeline de deploy)
+
+---
+
+## PWA (Progressive Web App)
+
+La aplicación es instalable en iPads como PWA:
+
+- **Offline-first**: assets estáticos precacheados por Workbox, datos de Firestore con estrategia `NetworkFirst` (fallback a cache si no hay red)
+- **Instalable**: manifest con `display: standalone`, iconos y tema configurados
+- **Auto-update**: service worker se actualiza automáticamente cuando hay nueva versión desplegada
+- **Auth siempre online**: las peticiones a Firebase Auth usan `NetworkOnly` (nunca se cachean tokens)
+
+Para instalar en iPad: Safari → Compartir → "Agregar a la pantalla de inicio"
 
 ---
 

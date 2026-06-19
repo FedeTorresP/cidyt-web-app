@@ -1,0 +1,4 @@
+# Los JSONs exportados de IPADCK pueden ser grandes y/o contener datos sensibles.
+# Solo se versiona este .gitignore como placeholder de la carpeta.
+*.json
+!.gitignore
