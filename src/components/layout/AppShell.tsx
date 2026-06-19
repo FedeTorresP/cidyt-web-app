@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Outlet, useNavigate, useLocation } from '@tanstack/react-router'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useAuth } from '@/hooks/use-auth'
 import { useMenu } from '@/hooks/use-menu'
 import { useOnline } from '@/hooks/use-online'
+import { useTouchPrimary } from '@/hooks/use-touch-primary'
+import { useSidebarGesture, SIDEBAR_EDGE_ZONE } from '@/hooks/use-sidebar-gesture'
 import { logout } from '@/services/auth'
 import { SidebarNav } from './SidebarNav'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -16,18 +18,90 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { overlayFade } from '@/lib/motion'
+import { SIDEBAR_WIDTH, springSheet } from '@/lib/motion'
+
+const SIDEBAR_STORAGE_KEY = 'cidyt_sidebar_open'
+
+function readStoredSidebarOpen(fallback: boolean): boolean {
+  if (typeof sessionStorage === 'undefined') return fallback
+  const stored = sessionStorage.getItem(SIDEBAR_STORAGE_KEY)
+  if (stored === null) return fallback
+  return stored === 'true'
+}
 
 export function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, firebaseUser } = useAuth()
   const online = useOnline()
+  const touchPrimary = useTouchPrimary()
+  const overlayMode = touchPrimary
+  const reduced = useReducedMotion()
   const isCubiculos = location.pathname === '/cubiculo/listado'
   const { data: menuItems, isLoading: menuLoading, error: menuError } = useMenu()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  const defaultOpen = !touchPrimary
+  const [sidebarOpen, setSidebarOpen] = useState(() => readStoredSidebarOpen(defaultOpen))
   const [logoutOpen, setLogoutOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+
+  const handleSidebarOpenChange = useCallback((open: boolean) => {
+    setSidebarOpen(open)
+    sessionStorage.setItem(SIDEBAR_STORAGE_KEY, String(open))
+  }, [])
+
+  const {
+    sidebarX,
+    overlayOpacity,
+    isDragging,
+    showOverlay,
+    handleSidebarDrag,
+    handleSidebarDragEnd,
+    handleEdgePointerDown,
+    handleEdgePointerMove,
+    handleEdgePointerUp,
+    handleEdgePointerCancel,
+    resetDrag,
+    acquireLock,
+  } = useSidebarGesture({
+    overlayMode,
+    open: sidebarOpen,
+    onOpenChange: handleSidebarOpenChange,
+  })
+
+  useEffect(() => {
+    if (!overlayMode) return
+    if (sidebarOpen || showOverlay) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [overlayMode, sidebarOpen, showOverlay])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && sidebarOpen) {
+        handleSidebarOpenChange(false)
+        resetDrag()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [sidebarOpen, handleSidebarOpenChange, resetDrag])
+
+  const toggleSidebar = useCallback(() => {
+    acquireLock()
+    resetDrag()
+    handleSidebarOpenChange(!sidebarOpen)
+  }, [acquireLock, resetDrag, handleSidebarOpenChange, sidebarOpen])
+
+  const closeSidebar = useCallback(() => {
+    resetDrag()
+    handleSidebarOpenChange(false)
+  }, [resetDrag, handleSidebarOpenChange])
 
   const userName = (
     firebaseUser?.displayName ||
@@ -50,37 +124,77 @@ export function AppShell() {
     }
   }
 
+  const mainMarginLeft = !overlayMode && sidebarOpen ? SIDEBAR_WIDTH : 0
+  const hamburgerTranslateX = sidebarOpen ? SIDEBAR_WIDTH - 44 - 8 : 0
+  const sidebarClosed = !sidebarOpen && !isDragging
+
+  const asideAnimateX = isDragging && !sidebarOpen
+    ? sidebarX
+    : sidebarOpen
+      ? 0
+      : -SIDEBAR_WIDTH
+
   return (
     <div className="flex flex-row" style={{ minHeight: '100dvh' }}>
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div
-            key="sidebar-overlay"
-            className="fixed inset-0 z-[199] lg:hidden"
-            style={{ backgroundColor: 'rgba(10,31,92,0.4)' }}
-            variants={overlayFade}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-      </AnimatePresence>
+      {overlayMode && showOverlay && (
+        <motion.div
+          className="fixed inset-0 z-[199]"
+          style={{
+            backgroundColor: 'rgba(10,31,92,0.4)',
+            opacity: overlayOpacity,
+            pointerEvents: overlayOpacity > 0.1 ? 'auto' : 'none',
+          }}
+          onClick={closeSidebar}
+          aria-hidden="true"
+        />
+      )}
+
+      {overlayMode && !sidebarOpen && (
+        <div
+          className="fixed top-0 bottom-0 z-[198]"
+          style={{
+            left: 'env(safe-area-inset-left)',
+            width: SIDEBAR_EDGE_ZONE,
+            touchAction: 'none',
+          }}
+          onPointerDown={handleEdgePointerDown}
+          onPointerMove={handleEdgePointerMove}
+          onPointerUp={handleEdgePointerUp}
+          onPointerCancel={handleEdgePointerCancel}
+          aria-hidden="true"
+        />
+      )}
 
       <motion.aside
-        className="fixed top-0 left-0 z-[200] flex flex-col overflow-hidden"
+        className="fixed top-0 left-0 z-[200] flex flex-col overflow-hidden gpu-layer"
         style={{
-          width: 200,
-          minWidth: 200,
+          width: SIDEBAR_WIDTH,
+          minWidth: SIDEBAR_WIDTH,
           height: '100dvh',
           backgroundColor: 'var(--color-primario)',
           overflowY: 'auto',
           overflowX: 'hidden',
           paddingBottom: 'env(safe-area-inset-bottom)',
+          paddingLeft: 'max(0px, env(safe-area-inset-left))',
+          paddingRight: 'max(0px, env(safe-area-inset-right))',
+          touchAction: isDragging ? 'none' : 'auto',
+          pointerEvents: overlayMode && sidebarClosed ? 'none' : 'auto',
         }}
-        animate={{ x: sidebarOpen ? 0 : -200 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+        initial={false}
+        animate={
+          isDragging && sidebarOpen
+            ? false
+            : { x: asideAnimateX }
+        }
+        drag={overlayMode && !reduced && sidebarOpen ? 'x' : false}
+        dragConstraints={{ left: -SIDEBAR_WIDTH, right: 0 }}
+        dragElastic={0}
+        dragMomentum={false}
+        onDrag={handleSidebarDrag}
+        onDragEnd={handleSidebarDragEnd}
+        transition={reduced ? { duration: 0 } : springSheet}
         aria-label="Panel de navegación"
+        aria-hidden={overlayMode && sidebarClosed}
       >
         {menuLoading ? (
           <div className="flex items-center justify-center py-6 flex-1">
@@ -95,6 +209,7 @@ export function AppShell() {
             items={menuItems ?? []}
             userName={userName}
             turno={turno}
+            onNavigate={overlayMode ? closeSidebar : undefined}
           />
         )}
 
@@ -107,7 +222,7 @@ export function AppShell() {
         >
           <motion.button
             onClick={() => setLogoutOpen(true)}
-            className="flex items-center justify-center gap-2 w-full"
+            className="flex items-center justify-center gap-2 w-full interactive"
             style={{
               minHeight: 44,
               padding: '0 12px',
@@ -117,9 +232,8 @@ export function AppShell() {
               borderRadius: 'var(--radius-default)',
               fontSize: '0.8125rem',
               fontWeight: 500,
-              touchAction: 'manipulation',
             }}
-            whileTap={{ scale: 0.97 }}
+            whileTap={reduced ? undefined : { scale: 0.97 }}
             aria-label="Cerrar sesión"
           >
             <svg
@@ -143,11 +257,12 @@ export function AppShell() {
       </motion.aside>
 
       <main
-        className="flex-1 flex flex-col bg-[var(--color-fondo)] transition-[margin-left] duration-[250ms] ease-in-out"
+        className="flex-1 flex flex-col bg-[var(--color-fondo)] min-h-0"
         style={{
           minHeight: '100dvh',
-          marginLeft: sidebarOpen ? 200 : 0,
+          marginLeft: mainMarginLeft,
           paddingTop: 'env(safe-area-inset-top)',
+          transition: reduced ? 'none' : 'margin-left 250ms ease-in-out',
         }}
       >
         {!online && (
@@ -163,11 +278,12 @@ export function AppShell() {
         )}
 
         <motion.button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
+          onClick={toggleSidebar}
+          className="interactive gpu-layer"
           style={{
             position: 'fixed',
             top: 'calc(8px + env(safe-area-inset-top))',
-            left: sidebarOpen ? 164 : 8,
+            left: 'calc(8px + env(safe-area-inset-left))',
             zIndex: 201,
             width: 44,
             height: 44,
@@ -180,16 +296,15 @@ export function AppShell() {
             color: isCubiculos ? '#e2e8f0' : '#fff',
             border: 'none',
             borderRadius: isCubiculos ? '0' : '6px',
-            touchAction: 'manipulation',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             boxShadow: 'none',
           }}
-          whileTap={{ scale: 0.93 }}
-          animate={{ left: sidebarOpen ? 164 : 8 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+          animate={{ x: hamburgerTranslateX }}
+          transition={reduced ? { duration: 0 } : springSheet}
+          whileTap={reduced ? undefined : { scale: 0.93 }}
           aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
           aria-expanded={sidebarOpen}
         >
@@ -210,9 +325,9 @@ export function AppShell() {
         </motion.button>
 
         <div
-          className="flex-1"
+          className="flex-1 min-h-0 overflow-y-auto scroll-touch"
           style={{
-            padding: sidebarOpen
+            padding: sidebarOpen && !overlayMode
               ? '12px 24px calc(24px + env(safe-area-inset-bottom)) 24px'
               : '12px 24px calc(24px + env(safe-area-inset-bottom)) 50px',
           }}
@@ -220,7 +335,7 @@ export function AppShell() {
           <Outlet />
         </div>
 
-        <footer className="text-center text-[11px] text-[var(--color-texto-suave)] py-6 mt-auto">
+        <footer className="text-center text-[11px] text-[var(--color-texto-suave)] py-6 mt-auto shrink-0">
           Desarrollado por: Médica Sur – Sistemas y T.I. · Copyright © {new Date().getFullYear()}. All rights reserved.
         </footer>
       </main>

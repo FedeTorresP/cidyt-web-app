@@ -60,9 +60,10 @@ interface SidebarNavProps {
   items: NavMenuItem[]
   userName: string
   turno: string | null
+  onNavigate?: () => void
 }
 
-export function SidebarNav({ items, userName, turno }: SidebarNavProps) {
+export function SidebarNav({ items, userName, turno, onNavigate }: SidebarNavProps) {
   const location = useLocation()
   const inicial = userName.charAt(0).toUpperCase()
 
@@ -120,7 +121,7 @@ export function SidebarNav({ items, userName, turno }: SidebarNavProps) {
 
       {/* ── Bloque 3: Navegación Principal (scrollable) ── */}
       <nav
-        className="flex-1 overflow-y-auto overflow-x-hidden"
+        className="flex-1 overflow-y-auto overflow-x-hidden scroll-touch"
         style={{ padding: '6px 0' }}
         aria-label="Navegación principal"
       >
@@ -133,8 +134,9 @@ export function SidebarNav({ items, userName, turno }: SidebarNavProps) {
             <Link
               key={item.id}
               to={item.route}
+              onClick={onNavigate}
               aria-current={isActive ? 'page' : undefined}
-              className="flex items-center no-underline"
+              className="nav-link flex items-center no-underline interactive"
               style={{
                 minHeight: 44,
                 padding: '6px 12px',
@@ -145,8 +147,7 @@ export function SidebarNav({ items, userName, turno }: SidebarNavProps) {
                   : '3px solid transparent',
                 backgroundColor: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
                 color: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.72)',
-                transition: 'background-color 0.2s ease, border-left-color 0.2s ease',
-                touchAction: 'manipulation',
+                transition: 'background-color 0.2s ease, border-left-color 0.2s ease, transform var(--motion-duration-fast) var(--motion-spring)',
               }}
             >
               <span className="truncate">{item.label}</span>

@@ -1,5 +1,6 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, memo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
@@ -9,11 +10,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Pressable } from '@/components/ui/pressable'
 import { hapticFeedback } from '@/lib/motion'
 import { nowMX, formatDateMX } from '@/lib/timezone'
-import { useListaDia, useUpdatePacienteCache } from '@/hooks/use-lista-dia'
+import { useListaDia, useUpdatePacienteCache, LISTA_DIA_QUERY_KEY } from '@/hooks/use-lista-dia'
 import type { PacienteListaDia } from '@/hooks/use-lista-dia'
 
 export const Route = createLazyFileRoute('/_authenticated/lista-dia')({
@@ -227,12 +227,9 @@ function EstatusCellPicker({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Pressable
+          variant="lite"
           className="estatus-cell"
           style={{
-            width: 36,
-            height: 36,
-            minWidth: 36,
-            minHeight: 36,
             backgroundColor: estatus.esBorde ? 'transparent' : estatus.color,
             border: estatus.esBorde ? '1.5px solid #d1d5db' : 'none',
             color: estatus.esBorde ? 'transparent' : '#ffffff',
@@ -284,6 +281,7 @@ function DesayunoPicker({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Pressable
+          variant="lite"
           className="touch-target"
           style={{
             backgroundColor: opt?.color ?? '#666',
@@ -291,8 +289,8 @@ function DesayunoPicker({
             fontSize: '0.65rem',
             fontWeight: 700,
             width: 50,
-            height: 32,
-            minHeight: 32,
+            minWidth: 50,
+            minHeight: 44,
             borderRadius: 4,
           }}
           aria-label="Desayuno"
@@ -320,6 +318,126 @@ function DesayunoPicker({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENTE — Fila de paciente (memoizada)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+interface PacienteRowProps {
+  pac: PacienteListaDia
+  idx: number
+  onDesayunoChange: (seguimientoId: string, value: 0 | 1 | 2) => void
+  onEstudioChange: (seguimientoId: string, estudioId: number, estatusId: number) => void
+  onOpenModal: (paciente: PacienteListaDia) => void
+}
+
+const PacienteRow = memo(function PacienteRow({
+  pac,
+  idx,
+  onDesayunoChange,
+  onEstudioChange,
+  onOpenModal,
+}: PacienteRowProps) {
+  const completo = pac.estatusValpac === 2
+  const listoParaSalir = pac.estatusValpac === 1
+  const tienePadecimiento = pac.padecimientoId > 0
+  const rowBgBase = idx % 2 === 0 ? 'var(--color-fondo)' : 'var(--color-fondo-card)'
+
+  const turnoBg = completo
+    ? 'rgba(0, 130, 180, 0.30)'
+    : tienePadecimiento
+      ? 'rgba(245, 180, 50, 0.30)'
+      : rowBgBase
+
+  const nombreBg = (completo || listoParaSalir)
+    ? 'rgba(0, 166, 81, 0.28)'
+    : tienePadecimiento
+      ? 'rgba(245, 180, 50, 0.30)'
+      : rowBgBase
+
+  return (
+    <tr style={{ backgroundColor: rowBgBase }}>
+      <td
+        className="sticky left-0 z-[9] px-0 py-[4px] text-center border-b border-b-[var(--color-borde)]"
+        style={{ backgroundColor: turnoBg }}
+      >
+        <span className="inline-flex items-center justify-center w-[18px] h-[18px] rounded-full bg-[rgba(10,31,92,0.08)] text-[var(--color-primario)] font-bold text-[0.7rem]">
+          {pac.turno}
+        </span>
+      </td>
+      <td
+        className="sticky left-[40px] z-[9] py-[4px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden"
+        style={{ backgroundColor: nombreBg, paddingLeft: '5px' }}
+      >
+        <div className="flex items-center gap-0.5">
+          <span className={`font-medium ${tienePadecimiento && !completo ? 'text-[#F57C00]' : 'text-[var(--color-texto)]'}`}>
+            {pac.nombre}
+          </span>
+          {tienePadecimiento && !completo && (
+            <svg className="w-4 h-4 shrink-0 text-[#F57C00] mr-1" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+            </svg>
+          )}
+        </div>
+      </td>
+      <td className="px-0 py-[4px] text-center border-b border-b-[var(--color-borde)] align-middle">
+        <DesayunoPicker
+          value={pac.desayuno}
+          onChange={(v) => onDesayunoChange(pac.seguimientoId, v)}
+        />
+      </td>
+      {ESTUDIOS_COLUMNAS.map((est) => {
+        const estatusId = pac.estudios[est.id] ?? 0
+        return (
+          <td
+            key={est.id}
+            className="interactive"
+            style={{ padding: '2px', textAlign: 'center', borderBottom: '1px solid var(--color-borde)', verticalAlign: 'middle' }}
+          >
+            <div className="flex items-center justify-center mx-auto">
+              <EstatusCellPicker
+                value={estatusId}
+                options={ESTATUS_ESTUDIO}
+                label={est.nombre}
+                onChange={(id) => onEstudioChange(pac.seguimientoId, est.id, id)}
+              />
+            </div>
+          </td>
+        )
+      })}
+      <td style={{ padding: '2px 2px', borderBottom: '1px solid var(--color-borde)', textAlign: 'center', verticalAlign: 'middle', overflow: 'visible' }}>
+        <Pressable
+          variant="lite"
+          onClick={() => onOpenModal(pac)}
+          className={`touch-target ${pac.tieneAdicionales ? 'animate-[obsPulse_2s_ease-in-out_1]' : ''}`}
+          style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+          aria-label={`Ver datos de ${pac.nombre}`}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke={pac.tieneAdicionales ? '#FF8C00' : '#0b2340'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="12" cy="12" r="3" stroke={pac.tieneAdicionales ? '#FF8C00' : '#0b2340'} strokeWidth="1.5" />
+          </svg>
+        </Pressable>
+      </td>
+      <td className="px-0.5 py-[4px] border-b border-b-[var(--color-borde)] whitespace-normal break-words text-[0.7rem] leading-tight overflow-hidden">
+        {pac.medicoInternista ?? <span className="text-[var(--color-texto-suave)] text-[0.7rem]">SIN ASIGNAR</span>}
+      </td>
+      <td style={{ padding: '2px 2px', borderBottom: '1px solid var(--color-borde)', textAlign: 'center', verticalAlign: 'middle', overflow: 'visible' }}>
+        <Link
+          to="/paciente/$seguimientoId"
+          params={{ seguimientoId: pac.seguimientoId }}
+          className="touch-target inline-flex items-center justify-center interactive"
+          title={`Detalle seguimiento #${pac.seguimientoId}`}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="#0b2340" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="#0b2340" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </Link>
+      </td>
+    </tr>
+  )
+})
+
+/* ═══════════════════════════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL — ListaDiaPage
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -328,6 +446,7 @@ function ListaDiaPage() {
   const [fecha, setFecha] = useState(() => hoy)
   const { data: pacientes = [], refetch } = useListaDia(fecha)
   const updateCache = useUpdatePacienteCache()
+  const queryClient = useQueryClient()
   const [modalPaciente, setModalPaciente] = useState<PacienteListaDia | null>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const [toolbarHeight, setToolbarHeight] = useState(0)
@@ -361,11 +480,22 @@ function ListaDiaPage() {
 
   // Cambio de estatus de estudio (optimistic via cache)
   const handleEstudioChange = useCallback((seguimientoId: string, estudioId: number, estatusId: number) => {
-    const pac = pacientes.find((p) => p.seguimientoId === seguimientoId)
-    if (pac) {
-      updateCache(fecha, seguimientoId, { estudios: { ...pac.estudios, [estudioId]: estatusId } })
-    }
-  }, [fecha, updateCache, pacientes])
+    queryClient.setQueryData<PacienteListaDia[]>(
+      [...LISTA_DIA_QUERY_KEY, fecha],
+      (old) => {
+        if (!old) return old
+        return old.map((p) =>
+          p.seguimientoId === seguimientoId
+            ? { ...p, estudios: { ...p.estudios, [estudioId]: estatusId } }
+            : p,
+        )
+      },
+    )
+  }, [fecha, queryClient])
+
+  const handleOpenModal = useCallback((paciente: PacienteListaDia) => {
+    setModalPaciente(paciente)
+  }, [])
 
   return (
     <div className="text-[0.8rem]">
@@ -386,7 +516,8 @@ function ListaDiaPage() {
         />
         <button
           onClick={handleActualizar}
-          style={{ flexShrink: 0, minHeight: '44px', padding: '0 16px', fontWeight: 600, fontSize: '0.875rem', color: '#ffffff', backgroundColor: '#0b2340', borderRadius: '8px', border: 'none', cursor: 'pointer', touchAction: 'manipulation' }}
+          className="interactive"
+          style={{ flexShrink: 0, minHeight: '44px', padding: '0 16px', fontWeight: 600, fontSize: '0.875rem', color: '#ffffff', backgroundColor: '#0b2340', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
         >
           ↻ Actualizar
         </button>
@@ -400,7 +531,7 @@ function ListaDiaPage() {
         style={{ backgroundColor: 'var(--color-fondo-card)', border: '1px solid var(--color-borde)', borderRadius: '8px', padding: '6px 16px', marginBottom: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}
       >
         <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-texto)' }}>Código de Colores</span>
-        <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '10px', alignItems: 'center', overflowX: 'auto', paddingBottom: '4px' }}>
+        <div className="scroll-x scroll-touch" style={{ display: 'flex', flexWrap: 'nowrap', gap: '10px', alignItems: 'center', paddingBottom: '4px' }}>
           {LEYENDA.map((item) => (
             <div key={item.nombre} style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
               <span style={{ width: '14px', height: '14px', borderRadius: '3px', flexShrink: 0, backgroundColor: item.color }} />
@@ -416,16 +547,14 @@ function ListaDiaPage() {
           No hay pacientes para esta fecha.
         </div>
       ) : (
-        <div style={{ borderRadius: '10px' }}>
-          <table className="border-collapse w-full bg-[var(--color-fondo-card)] table-fixed">
+        <div className="scroll-x scroll-touch rounded-[10px] shadow-[var(--shadow-card)] border border-[var(--color-borde)]">
+          <table className="border-collapse w-full bg-[var(--color-fondo-card)] table-fixed min-w-[1100px]">
             <thead className="bg-[var(--color-primario)] z-10" style={{ position: 'sticky', top: `${toolbarHeight}px` }}>
               <tr>
-                {/* Turno — sticky */}
                 <th className="sticky left-0 z-[11] bg-[var(--color-primario)] py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[40px]" style={{ paddingLeft: '1px', borderTopLeftRadius: '10px' }}>
                   Turno
                 </th>
-                {/* Nombre — sticky */}
-                <th className="sticky left-[20px] z-[11] bg-[var(--color-primario)] py-1.5 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[160px]" style={{ paddingLeft: '10px' }}>
+                <th className="sticky left-[40px] z-[11] bg-[var(--color-primario)] py-1.5 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[160px]" style={{ paddingLeft: '10px' }}>
                   Nombre del Paciente
                 </th>
                 {/* Desayuno */}
@@ -461,124 +590,16 @@ function ListaDiaPage() {
               </tr>
             </thead>
             <tbody>
-              {pacientes.map((pac, idx) => {
-                const completo = pac.estatusValpac === 2
-                const listoParaSalir = pac.estatusValpac === 1
-                const tienePadecimiento = pac.padecimientoId > 0
-                const rowBgBase = idx % 2 === 0 ? 'var(--color-fondo)' : 'var(--color-fondo-card)'
-
-                // Color de celda Turno
-                const turnoBg = completo
-                  ? 'rgba(0, 130, 180, 0.30)'
-                  : tienePadecimiento
-                    ? 'rgba(245, 180, 50, 0.30)'
-                    : rowBgBase
-
-                // Color de celda Nombre
-                const nombreBg = (completo || listoParaSalir)
-                  ? 'rgba(0, 166, 81, 0.28)'
-                  : tienePadecimiento
-                    ? 'rgba(245, 180, 50, 0.30)'
-                    : rowBgBase
-
-                return (
-                  <tr key={pac.seguimientoId} style={{ backgroundColor: rowBgBase }}>
-                    {/* Turno — sticky */}
-                    <td
-                      className="sticky left-0 z-[9] px-0 py-[4px] text-center border-b border-b-[var(--color-borde)]"
-                      style={{ backgroundColor: turnoBg }}
-                    >
-                      <span className="inline-flex items-center justify-center w-[18px] h-[18px] rounded-full bg-[rgba(10,31,92,0.08)] text-[var(--color-primario)] font-bold text-[0.7rem]">
-                        {pac.turno}
-                      </span>
-                    </td>
-                    {/* Nombre — sticky */}
-                    <td
-                      className="sticky left-[40px] z-[9] py-[4px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden"
-                      style={{ backgroundColor: nombreBg, paddingLeft: '5px' }}
-                    >
-                      <div className="flex items-center gap-0.5">
-                        <span className={`font-medium ${tienePadecimiento && !completo ? 'text-[#F57C00]' : 'text-[var(--color-texto)]'}`}>
-                          {pac.nombre}
-                        </span>
-                        {tienePadecimiento && !completo && (
-                          <svg className="w-4 h-4 shrink-0 text-[#F57C00] mr-1" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                      </div>
-                    </td>
-                    {/* Desayuno — pill badge */}
-                    <td className="px-0 py-[4px] text-center border-b border-b-[var(--color-borde)] align-middle">
-                      <DesayunoPicker
-                        value={pac.desayuno}
-                        onChange={(v) => handleDesayunoChange(pac.seguimientoId, v)}
-                      />
-                    </td>
-
-                    {/* Celdas de estudios — cuadros sólidos con letra */}
-                    {ESTUDIOS_COLUMNAS.map((est) => {
-                      const estatusId = pac.estudios[est.id] ?? 0
-                      const estatus = ESTATUS_ESTUDIO.find((e) => e.id === estatusId) ?? ESTATUS_ESTUDIO[0]
-                      return (
-                        <td
-                          key={est.id}
-                          style={{ padding: '2px', textAlign: 'center', borderBottom: '1px solid var(--color-borde)', verticalAlign: 'middle' }}
-                        >
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
-                                <EstatusCellPicker
-                                  value={estatusId}
-                                  options={ESTATUS_ESTUDIO}
-                                  label={est.nombre}
-                                  onChange={(id) => handleEstudioChange(pac.seguimientoId, est.id, id)}
-                                />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>{`${est.nombre}: ${estatus.nombre}`}</TooltipContent>
-                          </Tooltip>
-                        </td>
-                      )
-                    })}
-
-                    {/* Obs — botón ojo → modal */}
-                    <td style={{ padding: '2px 2px', borderBottom: '1px solid var(--color-borde)', textAlign: 'center', verticalAlign: 'middle', overflow: 'visible' }}>
-                      <Pressable
-                        onClick={() => setModalPaciente(pac)}
-                        className={`touch-target ${pac.tieneAdicionales ? 'animate-[obsPulse_2s_ease-in-out_1]' : ''}`}
-                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
-                        aria-label={`Ver datos de ${pac.nombre}`}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke={pac.tieneAdicionales ? '#FF8C00' : '#0b2340'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          <circle cx="12" cy="12" r="3" stroke={pac.tieneAdicionales ? '#FF8C00' : '#0b2340'} strokeWidth="1.5" />
-                        </svg>
-                      </Pressable>
-                    </td>
-
-                    {/* Médico Internista */}
-                    <td className="px-0.5 py-[4px] border-b border-b-[var(--color-borde)] whitespace-normal break-words text-[0.7rem] leading-tight overflow-hidden">
-                      {pac.medicoInternista ?? <span className="text-[var(--color-texto-suave)] text-[0.7rem]">SIN ASIGNAR</span>}
-                    </td>
-
-                    {/* Vínculos */}
-                    <td style={{ padding: '2px 2px', borderBottom: '1px solid var(--color-borde)', textAlign: 'center', verticalAlign: 'middle', overflow: 'visible' }}>
-                      <Link
-                        to="/paciente/$seguimientoId"
-                        params={{ seguimientoId: pac.seguimientoId }}
-                        className="touch-target inline-flex items-center justify-center"
-                        title={`Detalle seguimiento #${pac.seguimientoId}`}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="#0b2340" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="#0b2340" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </Link>
-                    </td>
-                  </tr>
-                )
-              })}
+              {pacientes.map((pac, idx) => (
+                <PacienteRow
+                  key={pac.seguimientoId}
+                  pac={pac}
+                  idx={idx}
+                  onDesayunoChange={handleDesayunoChange}
+                  onEstudioChange={handleEstudioChange}
+                  onOpenModal={handleOpenModal}
+                />
+              ))}
             </tbody>
           </table>
         </div>

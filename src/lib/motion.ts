@@ -1,5 +1,8 @@
 import type { Transition, Variants } from 'framer-motion'
 
+/** Sidebar width in pixels — single source of truth */
+export const SIDEBAR_WIDTH = 200
+
 /** iOS-style spring for press interactions */
 export const springPress: Transition = {
   type: 'spring',
@@ -82,4 +85,9 @@ export function hapticFeedback(duration = 10) {
   if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
     navigator.vibrate(duration)
   }
+}
+
+/** Overlay opacity synced to sidebar drag progress (0 = open, 1 = closed) */
+export function sidebarOverlayOpacity(progress: number): number {
+  return Math.max(0, Math.min(1, 1 - progress))
 }

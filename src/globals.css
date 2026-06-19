@@ -60,7 +60,6 @@ html {
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  touch-action: manipulation;
 }
 
 body {
@@ -143,6 +142,7 @@ button {
   border-radius: var(--radius-default);
   min-height: 44px;
   padding: 0 16px;
+  touch-action: manipulation;
   transition: background-color var(--transition-default), box-shadow var(--transition-default), opacity var(--transition-default), transform var(--motion-duration-fast) var(--motion-spring);
   display: inline-flex;
   align-items: center;
@@ -321,4 +321,46 @@ h1.page-title {
   25% { transform: scale(1.3); opacity: 0.6; }
   50% { transform: scale(1); opacity: 1; }
   75% { transform: scale(1.3); opacity: 0.6; }
+}
+
+/* --------------------------------------------------------------------------
+   Touch & scroll utilities (iPad landscape)
+   -------------------------------------------------------------------------- */
+
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.scroll-x {
+  overflow-x: auto;
+  touch-action: pan-x pan-y;
+}
+
+.scroll-y {
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+.interactive {
+  touch-action: manipulation;
+}
+
+.gpu-layer {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+.pointer-events-none {
+  pointer-events: none;
+}
+
+/* Sidebar nav link press feedback (no framer-motion per link) */
+.nav-link:active {
+  transform: scale(0.98);
+}
+
+/* Lite pressable for dense table cells */
+.pressable-lite:active:not(:disabled) {
+  transform: scale(0.97);
 }
