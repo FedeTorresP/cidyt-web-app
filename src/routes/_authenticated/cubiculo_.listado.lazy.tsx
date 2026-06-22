@@ -72,10 +72,11 @@ export function CubiculosPage() {
 }
 
 function CubiculoCard({ item }: { item: CubiculoItem }) {
-  const { nombre, estatusId, medicoNombre, minTranscurridos } = item
+  const { nombre, estatusId, medicoLetra, medicoNombre, minTranscurridos } = item
 
   const showTimer = estatusId === 2 || estatusId === 3
   const showMedico = estatusId === 2 || estatusId === 3 || estatusId === 4
+  const medicoLabel = [medicoLetra, medicoNombre].filter(Boolean).join(' · ')
   const isInactive = estatusId === 5
 
   // Mapeo base de clases según estatus
@@ -141,11 +142,19 @@ function CubiculoCard({ item }: { item: CubiculoItem }) {
         )}
       </div>
 
-      {/* Footer Card */}
+      {/* Footer Card — letra (Firestore medicos) + apellido (API/mock) */}
       <div className="min-h-[1.4rem] flex items-center shrink-0 w-full overflow-hidden">
-        {showMedico && medicoNombre ? (
-          <span className="text-[1.35rem] font-bold text-white truncate block w-full">
-            {medicoNombre}
+        {showMedico && medicoLabel ? (
+          <span
+            className="text-[1.35rem] font-bold text-white truncate flex items-baseline gap-2 w-full"
+            aria-label={medicoLabel}
+          >
+            {medicoLetra ? (
+              <span className="text-[#38bdf8] shrink-0 tabular-nums">{medicoLetra}</span>
+            ) : null}
+            {medicoNombre ? (
+              <span className="truncate">{medicoNombre}</span>
+            ) : null}
           </span>
         ) : null}
       </div>

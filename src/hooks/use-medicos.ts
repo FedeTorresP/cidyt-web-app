@@ -20,6 +20,16 @@ async function fetchMedicosActivos(): Promise<MedicoActivo[]> {
   )
 }
 
+/** Mapa medicoId → letra para enriquecer listados operacionales (p. ej. cubículos TV). */
+export async function fetchMedicoLetraMap(): Promise<Map<string, string>> {
+  const medicos = await fetchMedicosActivos()
+  const map = new Map<string, string>()
+  for (const m of medicos) {
+    if (m.letra) map.set(m.id, m.letra)
+  }
+  return map
+}
+
 export function useMedicosActivos() {
   const { user, loading: authLoading } = useAuth()
 

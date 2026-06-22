@@ -142,12 +142,15 @@ export function useSesionesCubiculo() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { getFirebaseAuth } from '@/lib/firebase'
+import { fetchMedicoLetraMap } from '@/hooks/use-medicos'
 
 export interface CubiculoItem {
   cubiculoId: number
   nombre: string
   ordenMostrar: number
   medicoId: number | null
+  /** Resuelto client-side desde Firestore `medicos.letra`. */
+  medicoLetra?: string | null
   medicoNombre: string | null    // Solo apellido paterno, max 11 chars
   estatusId: number | null       // 1=Disponible, 2=Ocupado, 3=Terminado, 4=Conectado, 5=Inactivo
   estatusNombre: string | null
@@ -157,7 +160,24 @@ export interface CubiculoItem {
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
+async function enrichCubiculosWithMedicoLetra(items: CubiculoItem[]): Promise<CubiculoItem[]> {
+  const hasMedico = items.some((item) => item.medicoId != null)
+  if (!hasMedico) return items
+
+  try {
+    const letraMap = await fetchMedicoLetraMap()
+    return items.map((item) => ({
+      ...item,
+      medicoLetra:
+        item.medicoId != null ? (letraMap.get(String(item.medicoId)) ?? null) : null,
+    }))
+  } catch {
+    return items
+  }
+}
+
 async function fetchCubiculosListado(): Promise<CubiculoItem[]> {
+  let items: CubiculoItem[]
   try {
     const headers: HeadersInit = { 'Content-Type': 'application/json' }
     const user = getFirebaseAuth().currentUser
@@ -166,11 +186,11 @@ async function fetchCubiculosListado(): Promise<CubiculoItem[]> {
       headers.Authorization = `Bearer ${token}`
     }
     const res = await fetch(`${API_BASE}/api/cubiculo/listado`, { headers })
-    if (res.ok) return await res.json()
+    items = res.ok ? await res.json() : MOCK_CUBICULOS_LISTADO
   } catch {
-    // fallback to mock
+    items = MOCK_CUBICULOS_LISTADO
   }
-  return MOCK_CUBICULOS_LISTADO
+  return enrichCubiculosWithMedicoLetra(items)
 }
 
 export function useCubiculosListado() {

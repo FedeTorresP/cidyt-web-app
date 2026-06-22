@@ -26,7 +26,7 @@ const FALLBACK_MENU: NavMenuItem[] = [
   { id: 'fb-7', label: 'Mi Perfil y Accesos', route: '/mi-perfil', displayOrder: 7 },
   { id: 'fb-9', label: 'Lista Cubículos', route: '/cubiculo/listado', displayOrder: 8 },
   { id: 'fb-11', label: 'Crear Paquetes', route: '/paquetes', displayOrder: 9 },
-  { id: 'fb-12', label: 'Mantenimiento de Catálogos', route: '/catalogos', displayOrder: 10 },
+  { id: 'fb-12', label: 'Mantenimiento Catálogos', route: '/catalogos', displayOrder: 10 },
 ]
 
 function filterCatalogMenuForRole(

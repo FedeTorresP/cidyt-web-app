@@ -5,7 +5,13 @@ import {
   useReactTable,
   type ColumnDef,
 } from '@tanstack/react-table'
-import { MoreHorizontal, Plus, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  SFCheckmarkCircle,
+  SFEllipsisVertical,
+  SFMinusCircle,
+  SFSquareAndPencil,
+} from '@/components/icons/sf-symbols'
 import {
   useCatalogMaintenanceList,
   useCreateCatalogItem,
@@ -20,7 +26,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { AlertBanner } from '@/components/shared/AlertBanner'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -48,43 +53,58 @@ function matchesSearch(item: CatalogMaintenanceItem, query: string, keys: string
   })
 }
 
-function ActivoBadge({ activo }: { activo: boolean }) {
+function EstatusCell({ activo }: { activo: boolean }) {
+  if (activo) {
+    return (
+      <span className="inline-flex items-center justify-center" role="img" aria-label="Activo">
+        <SFCheckmarkCircle className="text-[var(--color-success)]" />
+        <span className="sr-only">Activo</span>
+      </span>
+    )
+  }
   return (
-    <span
-      className={cn(
-        'inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold',
-        activo
-          ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
-          : 'bg-[var(--color-error)]/15 text-[var(--color-error)]',
-      )}
-    >
-      {activo ? 'Activo' : 'Inactivo'}
+    <span className="inline-flex items-center justify-center" role="img" aria-label="Inactivo">
+      <SFMinusCircle className="text-[var(--color-texto-suave)]" />
+      <span className="sr-only">Inactivo</span>
     </span>
   )
 }
 
+const ordenColumn: ColumnDef<CatalogMaintenanceItem> = {
+  accessorKey: 'ordenMostrar',
+  header: 'Orden',
+  cell: ({ getValue }) => {
+    const v = getValue()
+    return v == null ? '—' : String(v)
+  },
+}
+
 function getDisplayColumns(config: AnyCatalogTabConfig): ColumnDef<CatalogMaintenanceItem>[] {
-  const base: ColumnDef<CatalogMaintenanceItem>[] = [
-    {
-      accessorKey: 'nombre',
-      header: 'Nombre',
-      cell: ({ getValue }) => (
-        <span className="text-left inline-block max-w-[280px] truncate" title={String(getValue() ?? '')}>
-          {String(getValue() ?? '—')}
-        </span>
-      ),
-    },
-  ]
+  const columns: ColumnDef<CatalogMaintenanceItem>[] = []
+
+  if (config.id !== 'especialidades') {
+    columns.push(ordenColumn)
+  }
+
+  columns.push({
+    accessorKey: 'nombre',
+    header: 'Nombre',
+    cell: ({ getValue }) => (
+      <span className="text-left inline-block max-w-[280px] truncate" title={String(getValue() ?? '')}>
+        {String(getValue() ?? '—')}
+      </span>
+    ),
+  })
 
   if (config.id === 'empresas') {
-    base.push({
+    columns.push({
       accessorKey: 'alias',
       header: 'Alias',
       cell: ({ getValue }) => String(getValue() ?? '—'),
     })
   }
 
-  base.push({
+  columns.push({
     accessorKey: 'descripcion',
     header: 'Descripción',
     cell: ({ getValue }) => (
@@ -94,24 +114,13 @@ function getDisplayColumns(config: AnyCatalogTabConfig): ColumnDef<CatalogMainte
     ),
   })
 
-  if (config.id !== 'especialidades') {
-    base.push({
-      accessorKey: 'ordenMostrar',
-      header: 'Orden',
-      cell: ({ getValue }) => {
-        const v = getValue()
-        return v == null ? '—' : String(v)
-      },
-    })
-  }
-
-  base.push({
+  columns.push({
     accessorKey: 'activo',
     header: 'Estatus',
-    cell: ({ getValue }) => <ActivoBadge activo={getValue() as boolean} />,
+    cell: ({ getValue }) => <EstatusCell activo={getValue() as boolean} />,
   })
 
-  return base
+  return columns
 }
 
 export function CatalogMaintenanceTab({ config }: CatalogMaintenanceTabProps) {
@@ -145,23 +154,45 @@ export function CatalogMaintenanceTab({ config }: CatalogMaintenanceTabProps) {
     return [
       ...dataColumns,
       {
-        id: 'actions',
-        header: '',
+        id: 'editar',
+        header: 'Editar',
+        cell: ({ row }) => {
+          const item = row.original
+          const label = config.itemLabel(item as never)
+          return (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="inline-flex h-9 w-9 items-center justify-center"
+              onClick={() => setEditingItem(item)}
+              aria-label={`Editar ${label}`}
+            >
+              <SFSquareAndPencil className="text-[var(--color-primario)]" />
+            </Button>
+          )
+        },
+      },
+      {
+        id: 'acciones',
+        header: 'Acciones',
         cell: ({ row }) => {
           const item = row.original
           const label = config.itemLabel(item as never)
           return (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label={`Acciones — ${label}`}>
-                  <MoreHorizontal className="h-4 w-4" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="inline-flex h-9 w-9 items-center justify-center"
+                  aria-label={`Más acciones — ${label}`}
+                >
+                  <SFEllipsisVertical className="text-[var(--color-texto-suave)]" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setEditingItem(item)}>
-                  Editar
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 {item.activo ? (
                   <DropdownMenuItem
                     destructive

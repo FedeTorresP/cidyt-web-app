@@ -13,6 +13,7 @@ export const Route = createFileRoute('/_authenticated/catalogos')({
 })
 
 const TAB_ORDER: CatalogTabId[] = ['cubiculos', 'empresas', 'especialidades']
+const PAGE_TITLE = 'Mantenimiento Catálogos'
 
 function CatalogosPage() {
   const { user } = useAuth()
@@ -22,7 +23,7 @@ function CatalogosPage() {
   if (!canManage) {
     return (
       <div style={{ width: '100%' }}>
-        <h1 className="page-title">Mantenimiento de Catálogos</h1>
+        <h1 className="page-title">{PAGE_TITLE}</h1>
         <AlertBanner variant="warning">
           No tiene permisos para acceder a esta sección. Solo administradores pueden mantener catálogos.
         </AlertBanner>
@@ -32,7 +33,7 @@ function CatalogosPage() {
 
   return (
     <div style={{ width: '100%' }}>
-      <h1 className="page-title">Mantenimiento de Catálogos</h1>
+      <h1 className="page-title">{PAGE_TITLE}</h1>
 
       <Tabs>
         <TabsList style={{ marginBottom: 24 }}>
