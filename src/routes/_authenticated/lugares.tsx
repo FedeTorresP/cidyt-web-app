@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { useMedicosActivos } from '@/hooks/use-medicos'
 import { useLugaresActivos } from '@/hooks/use-lugares'
 import { useHorariosActivos } from '@/hooks/use-horarios'
+import { useMedicosPorLugarEstudioMap } from '@/hooks/use-medico-lugar-estudio'
 import {
   useMedicoDiaAsignaciones,
   useCrearAsignacion,
@@ -38,6 +39,23 @@ function MedicoDiaPage() {
   const { data: medicos, isLoading: loadingMedicos, isError: errorMedicos, error: medicosError } = useMedicosActivos()
   const { data: lugares, isLoading: loadingLugares, isError: errorLugares, error: lugaresError } = useLugaresActivos()
   const { data: horarios, isLoading: loadingHorarios, isError: errorHorarios, error: horariosError } = useHorariosActivos()
+  const { map: medicosPorLugar } = useMedicosPorLugarEstudioMap()
+
+  const medicosFiltrados = useMemo(() => {
+    if (!medicos) return []
+    if (!formLugarId) return medicos
+    const ids = medicosPorLugar.get(formLugarId) ?? []
+    if (ids.length === 0) return []
+    const idSet = new Set(ids)
+    return medicos.filter((m) => idSet.has(m.id))
+  }, [medicos, formLugarId, medicosPorLugar])
+
+  useEffect(() => {
+    if (!formMedicoId || !formLugarId) return
+    if (!medicosFiltrados.some((m) => m.id === formMedicoId)) {
+      setFormMedicoId('')
+    }
+  }, [formLugarId, medicosFiltrados, formMedicoId])
 
   // ── Asignaciones del día ───────────────────────────────────────────────────
   const {
@@ -172,7 +190,7 @@ function MedicoDiaPage() {
                     className="h-11 w-full rounded-md border border-[var(--color-borde)] bg-white px-3 text-sm text-[var(--color-texto)] outline-none focus:ring-2 focus:ring-[var(--color-primario)]"
                   >
                     <option value="">— Seleccione médico —</option>
-                    {medicos?.map((m) => (
+                    {medicosFiltrados.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.letra ? `${m.letra} — ${m.nombreCompleto ?? `Médico #${m.id}`}` : (m.nombreCompleto ?? `Médico #${m.id}`)}
                       </option>

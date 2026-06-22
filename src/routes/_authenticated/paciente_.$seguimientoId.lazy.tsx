@@ -1,8 +1,12 @@
 import { createLazyFileRoute, useRouter } from '@tanstack/react-router'
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { useUpdatePacienteCache } from '@/hooks/use-lista-dia'
+import { useMedicosActivos } from '@/hooks/use-medicos'
+import { useEstudiosActivos } from '@/hooks/use-estudios'
+import { useMedicosPorLugarEstudioMap } from '@/hooks/use-medico-lugar-estudio'
+import { getMedicosPorLugar } from '@/lib/medico-resolver'
 import { formatDateMX, nowMX } from '@/lib/timezone'
 
 export const Route = createLazyFileRoute('/_authenticated/paciente_/$seguimientoId')({
@@ -19,15 +23,15 @@ interface EstudioRealizar {
   Nombre: string
   Estatus_Est_id: number
   Observaciones: string
-  Medico_id: number | null
+  Medico_id: string | null
   Letra_Est_Adic: string | null
   Activo: number
 }
 
 interface MedicoEsp {
-  Medico_id: number
+  Medico_id: string
   Nombre_Completo: string
-  Especialidad_id: number
+  Letra: string | null
 }
 
 interface Padecimiento {
@@ -36,8 +40,9 @@ interface Padecimiento {
 }
 
 interface MedicoInternista {
-  Medico_id: number
+  Medico_id: string
   Nombre_Completo: string
+  Letra: string | null
 }
 
 interface SeguimientoData {
@@ -47,7 +52,7 @@ interface SeguimientoData {
   Nombre_Paquete: string
   Desayuno: 0 | 1 | 2
   Padecimiento_id: number
-  Medico_id: number | null
+  Medico_id: string | null
   Estatus_Valpac_id: number
   Fecha_Ent_Resultados: string | null
   Hora_Ent_Resultados: string | null
@@ -60,9 +65,9 @@ interface SeguimientoData {
 
 interface Catalogos {
   padecimientos: Padecimiento[]
-  medicos_internistas: MedicoInternista[]
-  medico_esp: MedicoEsp[]
 }
+
+const LUGAR_INTERNISTA_ID = '10'
 
 /* ═══════════════════════════════════════════════════════════════════════════
    HELPERS
@@ -97,19 +102,6 @@ const MOCK_CATALOGOS: Catalogos = {
     { id: 2, nombre: 'Hipertensión' },
     { id: 3, nombre: 'Asma' },
   ],
-  medicos_internistas: [
-    { Medico_id: 1, Nombre_Completo: 'NEGREROS BALVANERA FABIOLA' },
-    { Medico_id: 2, Nombre_Completo: 'GARCIA LOPEZ ROBERTO' },
-    { Medico_id: 3, Nombre_Completo: 'MARTINEZ SOTO ANA' },
-  ],
-  medico_esp: [
-    { Medico_id: 10, Nombre_Completo: 'DR. LABORATORIOS A', Especialidad_id: 1 },
-    { Medico_id: 11, Nombre_Completo: 'DR. TORAX A', Especialidad_id: 2 },
-    { Medico_id: 12, Nombre_Completo: 'DR. ABDOMEN A', Especialidad_id: 3 },
-    { Medico_id: 13, Nombre_Completo: 'DR. MAMARIO A', Especialidad_id: 4 },
-    { Medico_id: 14, Nombre_Completo: 'DR. MASTOGRAFIA A', Especialidad_id: 5 },
-    { Medico_id: 15, Nombre_Completo: 'DR. OFTALMOLOGIA A', Especialidad_id: 15 },
-  ],
 }
 
 function getMockSeguimiento(id: string): SeguimientoData {
@@ -120,7 +112,7 @@ function getMockSeguimiento(id: string): SeguimientoData {
     Nombre_Paquete: 'CHECK UP CIDYT D',
     Desayuno: 0,
     Padecimiento_id: 0,
-    Medico_id: 1,
+    Medico_id: '1',
     Estatus_Valpac_id: 0,
     Fecha_Ent_Resultados: '2025-12-31',
     Hora_Ent_Resultados: '10:30:00',
@@ -128,11 +120,11 @@ function getMockSeguimiento(id: string): SeguimientoData {
     Hora_Envio_Resultados: null,
     Observaciones: '',
     estudios: [
-      { Estudio_Realizar_id: 1001, Estudio_id: 1, Nombre: 'Laboratorios', Estatus_Est_id: 4, Observaciones: '', Medico_id: 10, Letra_Est_Adic: null, Activo: 1 },
-      { Estudio_Realizar_id: 1002, Estudio_id: 2, Nombre: 'Torax', Estatus_Est_id: 4, Observaciones: '', Medico_id: 11, Letra_Est_Adic: null, Activo: 1 },
+      { Estudio_Realizar_id: 1001, Estudio_id: 1, Nombre: 'Laboratorios', Estatus_Est_id: 4, Observaciones: '', Medico_id: null, Letra_Est_Adic: null, Activo: 1 },
+      { Estudio_Realizar_id: 1002, Estudio_id: 2, Nombre: 'Torax', Estatus_Est_id: 4, Observaciones: '', Medico_id: null, Letra_Est_Adic: null, Activo: 1 },
       { Estudio_Realizar_id: 1003, Estudio_id: 3, Nombre: 'US. Abdomen', Estatus_Est_id: 2, Observaciones: '', Medico_id: null, Letra_Est_Adic: null, Activo: 1 },
       { Estudio_Realizar_id: 1004, Estudio_id: 7, Nombre: 'Ortopantomografía', Estatus_Est_id: 4, Observaciones: '', Medico_id: null, Letra_Est_Adic: null, Activo: 1 },
-      { Estudio_Realizar_id: 1005, Estudio_id: 15, Nombre: 'Oftalmología', Estatus_Est_id: 4, Observaciones: 'Sin observaciones', Medico_id: 15, Letra_Est_Adic: null, Activo: 1 },
+      { Estudio_Realizar_id: 1005, Estudio_id: 15, Nombre: 'Oftalmología', Estatus_Est_id: 4, Observaciones: 'Sin observaciones', Medico_id: null, Letra_Est_Adic: null, Activo: 1 },
       { Estudio_Realizar_id: 1006, Estudio_id: 100, Nombre: 'VIT. B 12, VITA D', Estatus_Est_id: 2, Observaciones: '', Medico_id: null, Letra_Est_Adic: 'A', Activo: 1 },
     ],
     val_corporal: { Peso: 0, Talla: 0 },
@@ -235,6 +227,42 @@ function SeguimientoPacientePage() {
   const updateListaDiaCache = useUpdatePacienteCache()
   const fechaHoy = formatDateMX(nowMX())
 
+  const { data: medicosFirestore = [] } = useMedicosActivos()
+  const { data: estudiosCatalog = [] } = useEstudiosActivos()
+  const { map: medicosPorLugar } = useMedicosPorLugarEstudioMap()
+
+  const medicoResolverCtx = useMemo(
+    () => ({
+      medicosPorLugar,
+      medicosCatalog: new Map(
+        medicosFirestore.map((m) => [m.id, { id: m.id, letra: m.letra, nombreCompleto: m.nombreCompleto }]),
+      ),
+    }),
+    [medicosPorLugar, medicosFirestore],
+  )
+
+  const medicosInternistas = useMemo((): MedicoInternista[] => {
+    return getMedicosPorLugar(LUGAR_INTERNISTA_ID, medicoResolverCtx).map((m) => ({
+      Medico_id: m.id,
+      Nombre_Completo: m.nombreCompleto ?? `Médico #${m.id}`,
+      Letra: m.letra,
+    }))
+  }, [medicoResolverCtx])
+
+  const getMedicosForEstudioCol = useCallback((estudioColId: number): MedicoEsp[] => {
+    const estudio = estudiosCatalog.find((e) => e.id === String(estudioColId))
+    if (!estudio?.lugarEstudioId) return []
+    return getMedicosPorLugar(estudio.lugarEstudioId, medicoResolverCtx).map((m) => ({
+      Medico_id: m.id,
+      Nombre_Completo: m.nombreCompleto ?? `Médico #${m.id}`,
+      Letra: m.letra,
+    }))
+  }, [estudiosCatalog, medicoResolverCtx])
+
+  function formatMedicoOption(m: { Medico_id: string; Nombre_Completo: string; Letra: string | null }): string {
+    return m.Letra ? `${m.Letra} — ${m.Nombre_Completo}` : m.Nombre_Completo
+  }
+
   // Estado principal
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -244,7 +272,7 @@ function SeguimientoPacientePage() {
   // Formulario state
   const [desayuno, setDesayuno] = useState<number>(0)
   const [padecimientoId, setPadecimientoId] = useState<number>(0)
-  const [medicoId, setMedicoId] = useState<number | null>(null)
+  const [medicoId, setMedicoId] = useState<string | null>(null)
   const [estatusValpac, setEstatusValpac] = useState<number>(0)
   const [peso, setPeso] = useState<string>('')
   const [talla, setTalla] = useState<string>('')
@@ -291,7 +319,7 @@ function SeguimientoPacientePage() {
     setCatalogos(cats)
     setDesayuno(seg.Desayuno)
     setPadecimientoId(seg.Padecimiento_id)
-    setMedicoId(seg.Medico_id)
+    setMedicoId(seg.Medico_id != null ? String(seg.Medico_id) : null)
     setEstatusValpac(seg.Estatus_Valpac_id)
     setPeso(seg.val_corporal?.Peso?.toString() ?? '0')
     setTalla(seg.val_corporal?.Talla?.toString() ?? '0')
@@ -343,7 +371,7 @@ function SeguimientoPacientePage() {
   }, [seguimientoId, desayuno, padecimientoId, medicoId, estatusValpac, fechaEntrega, horaEntrega, entregados, enviar, fechaEnvio, horaEnvio, observaciones, peso, talla, router])
 
   // Guardar estudio individual (médico + observaciones)
-  const handleEstudioSave = useCallback(async (estudioRealizarId: number, medId: number | null, obs: string) => {
+  const handleEstudioSave = useCallback(async (estudioRealizarId: number, medId: string | null, obs: string) => {
     try {
       const headers = await authHeaders()
       await fetch(`${API_BASE}/api/estudios/${estudioRealizarId}`, {
@@ -406,7 +434,7 @@ function SeguimientoPacientePage() {
   }, [seguimientoId])
 
   // Update estudio local state
-  const updateEstudioLocal = useCallback((id: number, field: 'Medico_id' | 'Observaciones', value: number | string | null) => {
+  const updateEstudioLocal = useCallback((id: number, field: 'Medico_id' | 'Observaciones', value: string | null) => {
     setEstudios((prev) => prev.map((e) => e.Estudio_Realizar_id === id ? { ...e, [field]: value } : e))
   }, [])
 
@@ -538,11 +566,11 @@ function SeguimientoPacientePage() {
             <select
               style={selectStyle}
               value={medicoId ?? ''}
-              onChange={(e) => setMedicoId(e.target.value ? Number(e.target.value) : null)}
+              onChange={(e) => setMedicoId(e.target.value || null)}
             >
               <option value="">-- Sin asignar --</option>
-              {catalogos.medicos_internistas.map((m) => (
-                <option key={m.Medico_id} value={m.Medico_id}>{m.Nombre_Completo}</option>
+              {medicosInternistas.map((m) => (
+                <option key={m.Medico_id} value={m.Medico_id}>{formatMedicoOption(m)}</option>
               ))}
             </select>
           </div>
@@ -684,17 +712,14 @@ function SeguimientoPacientePage() {
             <thead>
               <tr style={{ background: 'var(--color-primario)' }}>
                 <th style={{ padding: '10px 12px', textAlign: 'left', color: '#fff', fontWeight: 600, fontSize: '0.75rem', width: '140px' }}>Estudio</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left', color: '#fff', fontWeight: 600, fontSize: '0.75rem' }}>Médico Internista</th>
+                <th style={{ padding: '10px 12px', textAlign: 'left', color: '#fff', fontWeight: 600, fontSize: '0.75rem' }}>Médico</th>
                 <th style={{ padding: '10px 12px', textAlign: 'left', color: '#fff', fontWeight: 600, fontSize: '0.75rem', width: '240px' }}>Observaciones</th>
               </tr>
             </thead>
             <tbody>
               {ESTUDIOS_PAQUETE.map((estCol, idx) => {
-                // Buscar si hay un estudio_realizar para este Estudio_id
                 const estData = estudiosRegulares.find((e) => e.Estudio_id === estCol.id)
-                // Filtrar médicos por especialidad (Especialidad_id = Estudio_id)
-                const medicosEsp = catalogos.medico_esp.filter((m) => m.Especialidad_id === estCol.id)
-                const medicosDisponibles = medicosEsp.length > 0 ? medicosEsp : catalogos.medico_esp
+                const medicosDisponibles = getMedicosForEstudioCol(estCol.id)
 
                 return (
                   <tr key={estCol.id} style={{ background: idx % 2 === 0 ? 'var(--color-fondo)' : 'var(--color-fondo-card)' }}>
@@ -706,16 +731,17 @@ function SeguimientoPacientePage() {
                         style={{ ...selectStyle, fontSize: '0.75rem' }}
                         value={estData?.Medico_id ?? ''}
                         onChange={(e) => {
-                          const val = e.target.value ? Number(e.target.value) : null
+                          const val = e.target.value || null
                           if (estData) {
                             updateEstudioLocal(estData.Estudio_Realizar_id, 'Medico_id', val)
                             handleEstudioSave(estData.Estudio_Realizar_id, val, estData.Observaciones)
                           }
                         }}
+                        disabled={medicosDisponibles.length === 0}
                       >
                         <option value="">—</option>
                         {medicosDisponibles.map((m) => (
-                          <option key={m.Medico_id} value={m.Medico_id}>{m.Nombre_Completo}</option>
+                          <option key={m.Medico_id} value={m.Medico_id}>{formatMedicoOption(m)}</option>
                         ))}
                       </select>
                     </td>

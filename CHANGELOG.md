@@ -5,6 +5,27 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.5.0] — 2026-06-22
+
+### Fase 1 — Letras de médico en Lista de Pacientes
+
+Tras **[3.4.0]** (catálogos alineados con Firestore), esta versión implementa la asignación y visualización de letras de médico en la matriz de estudios.
+
+#### Agregado
+- **`src/lib/medico-resolver.ts`**: resuelve médicos disponibles por estudio (intersección `medico_lugar_estudio` ∩ `medico_lugar_dia` del día)
+- **Hook `use-medicos-disponibles.ts`**: carga catálogos y expone `getMedicosForEstudio()` / `isAsignable()`
+- **Diálogo de picker** en `/lista-dia`: cuando hay 2+ médicos presentes al marcar "En Proceso"
+- **Mutación `useUpdateEstudioPaciente`**: escribe `estatusEstudioId`, `medicoId`, `letraMedico` en `estudios_paciente` (Firestore directo, con cache optimista)
+- **Índice compuesto** `estudios_paciente`: `seguimientoId` + `estudioId` + `activo`
+
+#### Modificado
+- **`use-lista-dia.ts`**: `estudios` pasa de `Record<number, number>` a `EstudioCellState` (estatus + letra + doc id); enriquecimiento desde Firestore al cargar
+- **`lista-dia.lazy.tsx`**: celdas asignables muestran letra del médico (no E/C/P); auto-asignación con 1 médico; toast si 0 médicos (permite "En Proceso" sin letra)
+- **`lugares.tsx`**: dropdown de médico filtrado por `lugar_estudio` seleccionado (`medico_lugar_estudio`)
+- **`paciente_.$seguimientoId.lazy.tsx`**: médicos internistas y por estudio desde Firestore (`medico_lugar_estudio` + `estudios.lugarEstudioId`); opciones con formato `LETRA — Nombre`
+
+---
+
 ## [3.4.0] — 2026-06-22
 
 ### Fase 0 — Alineación de catálogos Firestore (post-PWA / post-seed)

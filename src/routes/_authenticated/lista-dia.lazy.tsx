@@ -1,9 +1,24 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { nowMX, formatDateMX } from '@/lib/timezone'
-import { useListaDia, useUpdatePacienteCache } from '@/hooks/use-lista-dia'
-import type { PacienteListaDia } from '@/hooks/use-lista-dia'
+import {
+  useListaDia,
+  useUpdatePacienteCache,
+  useUpdateEstudioPaciente,
+  buildEstudioCellUpdate,
+} from '@/hooks/use-lista-dia'
+import type { PacienteListaDia, EstudioCellState } from '@/hooks/use-lista-dia'
+import { useMedicosDisponiblesPorEstudio } from '@/hooks/use-medicos-disponibles'
+import type { MedicoOption } from '@/hooks/use-medicos-disponibles'
 
 export const Route = createLazyFileRoute('/_authenticated/lista-dia')({
   component: ListaDiaPage,
@@ -68,6 +83,72 @@ const LEYENDA = [
   { nombre: 'Estudio Combinado', color: '#873600' },
   { nombre: 'Estudios Adicionales', color: '#E65100' },
 ] as const
+
+const ESTATUS_EN_PROCESO = 3
+
+interface MedicoPickerState {
+  seguimientoId: string
+  estudioId: number
+  estudioNombre: string
+  medicos: MedicoOption[]
+}
+
+function getEstudioCellText(cell: EstudioCellState | undefined): string {
+  return cell?.letraMedico ?? ''
+}
+
+function getEstudioCellTextColor(estatusId: number, hasLetra: boolean): string {
+  if (!hasLetra) return 'transparent'
+  if (estatusId === ESTATUS_EN_PROCESO) return '#1a1a1a'
+  if (estatusId === 0 || estatusId === 1) return 'transparent'
+  return '#ffffff'
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENTE — Selector de Médico (En Proceso)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function MedicoPickerDialog({
+  state,
+  onSelect,
+  onCancel,
+}: {
+  state: MedicoPickerState | null
+  onSelect: (medico: MedicoOption) => void
+  onCancel: () => void
+}) {
+  return (
+    <Dialog open={state != null} onOpenChange={(open) => { if (!open) onCancel() }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Asignar médico</DialogTitle>
+          <DialogDescription>
+            {state ? `${state.estudioNombre} — seleccione el médico presente hoy` : ''}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-2 mt-2">
+          {state?.medicos.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => onSelect(m)}
+              className="flex items-center justify-start gap-3 w-full px-4 py-3 rounded-lg border border-[var(--color-borde)] bg-[var(--color-fondo)] hover:bg-[var(--color-fondo-card)] text-left transition-colors touch-manipulation min-h-[48px]"
+            >
+              {m.letra && (
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-[var(--color-primario)] text-white font-bold text-sm shrink-0">
+                  {m.letra}
+                </span>
+              )}
+              <span className="text-sm font-medium text-[var(--color-texto)] text-left flex-1 min-w-0 whitespace-normal">
+                {m.nombreCompleto ?? `Médico #${m.id}`}
+              </span>
+            </button>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    COMPONENTE — Modal Datos del Paciente
@@ -226,7 +307,10 @@ function ListaDiaPage() {
   const [fecha, setFecha] = useState(() => hoy)
   const { data: pacientes = [], refetch } = useListaDia(fecha)
   const updateCache = useUpdatePacienteCache()
+  const updateEstudio = useUpdateEstudioPaciente(fecha)
+  const { getMedicosForEstudio, isAsignable } = useMedicosDisponiblesPorEstudio(fecha)
   const [modalPaciente, setModalPaciente] = useState<PacienteListaDia | null>(null)
+  const [medicoPicker, setMedicoPicker] = useState<MedicoPickerState | null>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const [toolbarHeight, setToolbarHeight] = useState(0)
 
@@ -257,13 +341,95 @@ function ListaDiaPage() {
     updateCache(fecha, seguimientoId, { desayuno: value })
   }, [fecha, updateCache])
 
-  // Cambio de estatus de estudio (optimistic via cache)
-  const handleEstudioChange = useCallback((seguimientoId: string, estudioId: number, estatusId: number) => {
+  const persistEstudio = useCallback((
+    seguimientoId: string,
+    estudioId: number,
+    estatusId: number,
+    medicoId?: string | null,
+    letraMedico?: string | null,
+    estudiosPacienteId?: string | null,
+  ) => {
+    updateEstudio.mutate({
+      seguimientoId,
+      estudioId,
+      estatusEstudioId: estatusId,
+      medicoId: medicoId ?? null,
+      letraMedico: letraMedico ?? null,
+      estudiosPacienteId: estudiosPacienteId ?? undefined,
+    }, {
+      onError: () => toast.error('No se pudo guardar el estatus del estudio.'),
+    })
+  }, [updateEstudio])
+
+  const handleEstudioChange = useCallback((
+    seguimientoId: string,
+    estudioId: number,
+    estudioNombre: string,
+    newEstatusId: number,
+  ) => {
     const pac = pacientes.find((p) => p.seguimientoId === seguimientoId)
-    if (pac) {
-      updateCache(fecha, seguimientoId, { estudios: { ...pac.estudios, [estudioId]: estatusId } })
+    if (!pac) return
+
+    const prevCell = pac.estudios[estudioId]
+    const asignable = isAsignable(estudioId)
+
+    if (!asignable) {
+      persistEstudio(
+        seguimientoId,
+        estudioId,
+        newEstatusId,
+        null,
+        null,
+        prevCell?.estudiosPacienteId,
+      )
+      return
     }
-  }, [fecha, updateCache, pacientes])
+
+    if (newEstatusId === ESTATUS_EN_PROCESO) {
+      const medicos = getMedicosForEstudio(estudioId)
+      if (medicos.length === 0) {
+        toast.warning('No hay médicos registrados presentes para esta área hoy.')
+        persistEstudio(seguimientoId, estudioId, ESTATUS_EN_PROCESO, null, null, prevCell?.estudiosPacienteId)
+      } else if (medicos.length === 1) {
+        persistEstudio(
+          seguimientoId,
+          estudioId,
+          ESTATUS_EN_PROCESO,
+          medicos[0].id,
+          medicos[0].letra,
+          prevCell?.estudiosPacienteId,
+        )
+      } else {
+        setMedicoPicker({ seguimientoId, estudioId, estudioNombre, medicos })
+      }
+      return
+    }
+
+    const newCell = buildEstudioCellUpdate(prevCell, newEstatusId)
+    persistEstudio(
+      seguimientoId,
+      estudioId,
+      newEstatusId,
+      newCell.medicoId,
+      newCell.letraMedico,
+      prevCell?.estudiosPacienteId,
+    )
+  }, [pacientes, isAsignable, getMedicosForEstudio, persistEstudio])
+
+  const handleMedicoPickerSelect = useCallback((medico: MedicoOption) => {
+    if (!medicoPicker) return
+    const pac = pacientes.find((p) => p.seguimientoId === medicoPicker.seguimientoId)
+    const prevCell = pac?.estudios[medicoPicker.estudioId]
+    persistEstudio(
+      medicoPicker.seguimientoId,
+      medicoPicker.estudioId,
+      ESTATUS_EN_PROCESO,
+      medico.id,
+      medico.letra,
+      prevCell?.estudiosPacienteId,
+    )
+    setMedicoPicker(null)
+  }, [medicoPicker, pacientes, persistEstudio])
 
   return (
     <div className="text-[0.8rem]">
@@ -443,8 +609,12 @@ function ListaDiaPage() {
 
                     {/* Celdas de estudios — cuadros sólidos con letra */}
                     {ESTUDIOS_COLUMNAS.map((est) => {
-                      const estatusId = pac.estudios[est.id] ?? 0
+                      const cell = pac.estudios[est.id]
+                      const estatusId = cell?.estatusId ?? 0
                       const estatus = ESTATUS_ESTUDIO.find((e) => e.id === estatusId) ?? ESTATUS_ESTUDIO[0]
+                      const cellText = getEstudioCellText(cell)
+                      const hasLetra = cellText.length > 0
+                      const textColor = getEstudioCellTextColor(estatusId, hasLetra)
                       return (
                         <td
                           key={est.id}
@@ -453,9 +623,9 @@ function ListaDiaPage() {
                           <div className="relative" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', margin: '0 auto' }}>
                             <select
                               value={estatusId}
-                              onChange={(e) => handleEstudioChange(pac.seguimientoId, est.id, Number(e.target.value))}
+                              onChange={(e) => handleEstudioChange(pac.seguimientoId, est.id, est.nombre, Number(e.target.value))}
                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-[1]"
-                              title={`${est.nombre}: ${estatus.nombre}`}
+                              title={`${est.nombre}: ${estatus.nombre}${cell?.letraMedico ? ` (${cell.letraMedico})` : ''}`}
                               aria-label={`${est.nombre}: ${estatus.nombre}`}
                             >
                               {ESTATUS_ESTUDIO.map((s) => (
@@ -468,10 +638,10 @@ function ListaDiaPage() {
                                 backgroundColor: estatus.esBorde ? 'transparent' : estatus.color,
                                 border: estatus.esBorde ? '1.5px solid #d1d5db' : 'none',
                                 borderRadius: '4px',
-                                color: estatus.esBorde ? 'transparent' : '#ffffff',
+                                color: textColor,
                               }}
                             >
-                              {estatus.letra}
+                              {cellText}
                             </span>
                           </div>
                         </td>
@@ -525,6 +695,12 @@ function ListaDiaPage() {
       {modalPaciente && (
         <ModalDatosPaciente paciente={modalPaciente} onClose={() => setModalPaciente(null)} />
       )}
+
+      <MedicoPickerDialog
+        state={medicoPicker}
+        onSelect={handleMedicoPickerSelect}
+        onCancel={() => setMedicoPicker(null)}
+      />
     </div>
   )
 }

@@ -41,6 +41,15 @@
         { "fieldPath": "seguimientoId", "order": "ASCENDING" },
         { "fieldPath": "activo", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "estudios_paciente",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "seguimientoId", "order": "ASCENDING" },
+        { "fieldPath": "estudioId", "order": "ASCENDING" },
+        { "fieldPath": "activo", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
