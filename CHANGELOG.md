@@ -5,7 +5,23 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
-## [3.6.0] — 2026-06-22
+## [3.6.1] — 2026-06-22 [`13d4418`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/13d4418)
+
+### Letra de médico en Lista Cubículos + pulido Mantenimiento Catálogos
+
+#### Agregado
+- **`fetchMedicoLetraMap()`** en `use-medicos.ts`: mapa `medicoId` → `letra` desde Firestore
+- **Enriquecimiento client-side** en `useCubiculosListado()`: tras API/mock listado, resuelve `medicos.letra` por `medicoId`
+- **Iconos SF-style** en `src/components/icons/sf-symbols.tsx` (`checkmark.circle`, `minus.circle`, `square.and.pencil`, `ellipsis.vertical`)
+
+#### Modificado
+- **`cubiculo_.listado.lazy.tsx`**: cards ocupadas muestran letra (celeste) + apellido; `aria-label` accesible
+- **`CatalogMaintenanceTab.tsx`**: columna Estatus con iconos a11y; columna Editar con lápiz; columna Acciones; Orden primera en Cubículos/Empresas
+- **`catalogos.tsx`** / **`use-menu.ts`**: título de página y fallback de menú → **Mantenimiento Catálogos** (alineado con `menu_items`)
+
+---
+
+## [3.6.0] — 2026-06-22 [`0e78202`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/0e78202)
 
 ### Fase 2 — Mantenimiento de Catálogos
 
@@ -31,7 +47,7 @@ Tras **[3.5.0]** (letras de médico en Lista de Pacientes), esta versión agrega
 
 ---
 
-## [3.5.0] — 2026-06-22
+## [3.5.0] — 2026-06-22 [`16aab33`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/16aab33)
 
 ### Fase 1 — Letras de médico en Lista de Pacientes
 
@@ -52,7 +68,7 @@ Tras **[3.4.0]** (catálogos alineados con Firestore), esta versión implementa 
 
 ---
 
-## [3.4.0] — 2026-06-22
+## [3.4.0] — 2026-06-22 [`3a884d9`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/3a884d9)
 
 ### Fase 0 — Alineación de catálogos Firestore (post-PWA / post-seed)
 
@@ -83,7 +99,7 @@ Tras **[3.3.0]** (PWA + seed de ~10k documentos desde IPADCK), la app seguía le
 
 ---
 
-## [3.3.0] — 2026-06-19
+## [3.3.0] — 2026-06-19 [`e68b115`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/e68b115)
 
 ### PWA + Seed de Catálogos Firestore
 
