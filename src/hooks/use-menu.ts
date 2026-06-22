@@ -26,7 +26,17 @@ const FALLBACK_MENU: NavMenuItem[] = [
   { id: 'fb-7', label: 'Mi Perfil y Accesos', route: '/mi-perfil', displayOrder: 7 },
   { id: 'fb-9', label: 'Lista Cubículos', route: '/cubiculo/listado', displayOrder: 8 },
   { id: 'fb-11', label: 'Crear Paquetes', route: '/paquetes', displayOrder: 9 },
+  { id: 'fb-12', label: 'Mantenimiento de Catálogos', route: '/catalogos', displayOrder: 10 },
 ]
+
+function filterCatalogMenuForRole(
+  items: NavMenuItem[],
+  roleId: string,
+  isSuperAdmin: boolean,
+): NavMenuItem[] {
+  if (isSuperAdmin || roleId === 'admin') return items
+  return items.filter((item) => item.route !== '/catalogos')
+}
 
 async function fetchMenu(roleId: string, isSuperAdmin: boolean): Promise<NavMenuItem[]> {
   try {
@@ -41,7 +51,7 @@ async function fetchMenu(roleId: string, isSuperAdmin: boolean): Promise<NavMenu
     // Si no hay menu_items en Firestore, usar fallback
     if (snapshot.empty) {
       console.warn('[Menu] Colección menu_items vacía — usando menú de fallback.')
-      return FALLBACK_MENU
+      return filterCatalogMenuForRole(FALLBACK_MENU, roleId, isSuperAdmin)
     }
 
     const items: MenuItem[] = snapshot.docs.map((doc) => ({
@@ -50,12 +60,13 @@ async function fetchMenu(roleId: string, isSuperAdmin: boolean): Promise<NavMenu
     })) as MenuItem[]
 
     const permissionIds = isSuperAdmin ? [] : await getRolePermissionIds(roleId)
-    return filterMenuByPermissions(items, permissionIds, isSuperAdmin)
+    const filtered = filterMenuByPermissions(items, permissionIds, isSuperAdmin, roleId)
+    return filterCatalogMenuForRole(filtered, roleId, isSuperAdmin)
   } catch (err) {
     // Si falla la lectura (permisos, índices, etc.), usar fallback
     console.error('[Menu] Error al cargar menu_items desde Firestore:', err)
     console.warn('[Menu] Usando menú de fallback.')
-    return FALLBACK_MENU
+    return filterCatalogMenuForRole(FALLBACK_MENU, roleId, isSuperAdmin)
   }
 }
 

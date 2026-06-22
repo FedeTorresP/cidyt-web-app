@@ -1,39 +1,60 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
+import { useAuth } from '@/hooks/use-auth'
+import { canManageCatalogs } from '@/services/auth'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { AlertBanner } from '@/components/shared/AlertBanner'
+import type { CatalogMaintenanceItem } from '@/lib/firestore-catalog-crud'
+import { CatalogMaintenanceTab } from '@/components/catalog-maintenance/CatalogMaintenanceTab'
+import { CATALOG_TAB_CONFIGS, type CatalogTabConfig, type CatalogTabId } from '@/components/catalog-maintenance/catalog-tab-config'
 
 export const Route = createFileRoute('/_authenticated/catalogos')({
   component: CatalogosPage,
 })
 
-const catalogos = [
-  { label: 'Empresas', route: '/catalogos/empresas', descripcion: 'Gestión de empresas clientes' },
-  { label: 'Médicos', route: '/catalogos/medicos', descripcion: 'Catálogo de médicos' },
-  { label: 'Cubículos', route: '/catalogos/cubiculos', descripcion: 'Configuración de cubículos' },
-  { label: 'Horarios', route: '/catalogos/horarios', descripcion: 'Horarios laborales' },
-  { label: 'Lugares', route: '/catalogos/lugares', descripcion: 'Catálogo de lugares' },
-  { label: 'Paquetes', route: '/catalogos/paquetes', descripcion: 'Paquetes de estudios' },
-  { label: 'Aplicaciones Menú', route: '/catalogos/aplicaciones-menu', descripcion: 'Elementos del menú' },
-]
+const TAB_ORDER: CatalogTabId[] = ['cubiculos', 'empresas', 'especialidades']
 
 function CatalogosPage() {
-  return (
-    <div>
-      <h1 className="page-title">Catálogos</h1>
+  const { user } = useAuth()
+  const canManage = canManageCatalogs(user)
+  const [activeTab, setActiveTab] = useState<CatalogTabId>('cubiculos')
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
-        {catalogos.map((cat) => (
-          <Link key={cat.route} to={cat.route} className="no-underline">
-            <Card className="hover:shadow-[var(--shadow-hover)] transition-shadow cursor-pointer h-full">
-              <CardHeader>
-                <CardTitle className="text-sm">{cat.label}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-[0.8rem] text-[var(--color-texto-suave)]">{cat.descripcion}</p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+  if (!canManage) {
+    return (
+      <div style={{ width: '100%' }}>
+        <h1 className="page-title">Mantenimiento de Catálogos</h1>
+        <AlertBanner variant="warning">
+          No tiene permisos para acceder a esta sección. Solo administradores pueden mantener catálogos.
+        </AlertBanner>
       </div>
+    )
+  }
+
+  return (
+    <div style={{ width: '100%' }}>
+      <h1 className="page-title">Mantenimiento de Catálogos</h1>
+
+      <Tabs>
+        <TabsList style={{ marginBottom: 24 }}>
+          {TAB_ORDER.map((tabId) => (
+            <TabsTrigger
+              key={tabId}
+              active={activeTab === tabId}
+              onClick={() => setActiveTab(tabId)}
+            >
+              {CATALOG_TAB_CONFIGS[tabId].label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {TAB_ORDER.map((tabId) => (
+          <TabsContent key={tabId} active={activeTab === tabId}>
+            <CatalogMaintenanceTab
+              config={CATALOG_TAB_CONFIGS[tabId] as CatalogTabConfig<CatalogMaintenanceItem>}
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   )
 }

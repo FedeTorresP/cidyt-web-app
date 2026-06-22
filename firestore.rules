@@ -14,9 +14,15 @@ service cloud.firestore {
         && '*' in request.auth.token.permissions;
     }
 
+    function isAdmin() {
+      return isAuth()
+        && (isSuperAdmin()
+          || request.auth.token.roleId == 'admin');
+    }
+
     // ─── Catálogos estáticos ───────────────────────────────────────────────
     // Lectura: cualquier usuario autenticado.
-    // Escritura: solo super admin (seed / mantenimiento).
+    // Escritura: super admin (seed) o admin (mantenimiento Fase 2 en colecciones indicadas).
 
     match /menu_items/{docId} {
       allow read: if isAuth();
@@ -50,7 +56,7 @@ service cloud.firestore {
 
     match /especialidades/{docId} {
       allow read: if isAuth();
-      allow write: if isSuperAdmin();
+      allow write: if isAdmin();
     }
 
     match /lugar_estudio/{docId} {
@@ -70,7 +76,7 @@ service cloud.firestore {
 
     match /empresas/{docId} {
       allow read: if isAuth();
-      allow write: if isSuperAdmin();
+      allow write: if isAdmin();
     }
 
     match /medicos/{docId} {
@@ -80,7 +86,7 @@ service cloud.firestore {
 
     match /cubiculos/{docId} {
       allow read: if isAuth();
-      allow write: if isSuperAdmin();
+      allow write: if isAdmin();
     }
 
     match /paquetes/{docId} {

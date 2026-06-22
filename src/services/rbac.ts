@@ -21,6 +21,13 @@ export async function getRolePermissionIds(roleId: string): Promise<string[]> {
   return snapshot.docs.map((doc) => doc.data().permisoId as string)
 }
 
+/** Rutas restringidas a administradores (mantenimiento de catálogos, etc.). */
+const ADMIN_ONLY_ROUTES = new Set(['/catalogos'])
+
+export function isAdminRole(roleId: string, isSuperAdmin: boolean): boolean {
+  return isSuperAdmin || roleId === 'admin'
+}
+
 /**
  * Filtra los elementos del menú según los permisos del rol.
  * SUPER_ADMIN ve todo. Los demás ven solo items sin permiso requerido
@@ -30,15 +37,22 @@ export function filterMenuByPermissions(
   items: MenuItem[],
   grantedPermissionIds: string[],
   isSuperAdmin: boolean,
+  roleId = '',
 ): NavMenuItem[] {
   const granted = new Set(grantedPermissionIds)
+  const isAdmin = isAdminRole(roleId, isSuperAdmin)
 
   const filtered = isSuperAdmin
     ? items
     : items.filter(
-        (item) =>
-          item.requiredPermissionId === null ||
-          granted.has(item.requiredPermissionId),
+        (item) => {
+          if (ADMIN_ONLY_ROUTES.has(item.route) && !isAdmin) return false
+          if (item.requiredPermissionId === 'admin') return isAdmin
+          return (
+            item.requiredPermissionId === null ||
+            granted.has(item.requiredPermissionId)
+          )
+        },
       )
 
   return filtered.map((item) => ({

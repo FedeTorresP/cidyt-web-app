@@ -74,6 +74,12 @@ export async function extractAuthUser(user: User): Promise<AuthUser> {
   }
 }
 
+/** Admin o super admin — acceso a Mantenimiento de Catálogos. */
+export function canManageCatalogs(user: AuthUser | null | undefined): boolean {
+  if (!user) return false
+  return user.isSuperAdmin || user.roleId === 'admin'
+}
+
 /**
  * Suscripción al estado de autenticación.
  */

@@ -5,6 +5,32 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.6.0] — 2026-06-22
+
+### Fase 2 — Mantenimiento de Catálogos
+
+Tras **[3.5.0]** (letras de médico en Lista de Pacientes), esta versión agrega la UI de administración para catálogos operativos.
+
+#### Agregado
+- **Página `/catalogos`** reescrita como **Mantenimiento de Catálogos** con pestañas (patrón Mi Perfil): Cubículos, Empresas, Especialidades
+- **`src/lib/firestore-catalog-crud.ts`**: lectura completa (activos + inactivos), alta, edición y baja lógica en Firestore
+- **Hook `use-catalog-maintenance.ts`**: queries y mutaciones con invalidación de cache
+- **Componentes** `CatalogMaintenanceTab`, `CatalogFormDialog`, `catalog-tab-config.ts`: tabla con búsqueda, paginación (empresas, 50/página), diálogo crear/editar, desactivar/reactivar
+- **`canManageCatalogs()`** en `auth.ts` — gate admin/super admin
+- **Entrada de menú** "Mantenimiento de Catálogos" en fallback (visible solo para admin)
+
+#### Modificado
+- **`models.ts`**: interface `Especialidad`; `Empresa` extendida (`descripcion`, `alias`, `ordenMostrar`); `Cubiculo.estatusCubiculoId`
+- **`firestore.rules`**: función `isAdmin()`; escritura en `cubiculos`, `empresas`, `especialidades` para admin o super admin
+- **`use-menu.ts`**: filtra `/catalogos` del menú para roles no admin
+- **`rbac.ts`**: `isAdminRole()` y filtro de rutas admin-only en menú Firestore
+
+#### Notas de despliegue
+- Desplegar reglas: `firebase deploy --only firestore:rules`
+- Opcional: agregar doc en `menu_items` con `route: /catalogos` para menú dinámico en producción
+
+---
+
 ## [3.5.0] — 2026-06-22
 
 ### Fase 1 — Letras de médico en Lista de Pacientes

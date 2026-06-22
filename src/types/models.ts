@@ -62,7 +62,10 @@ export interface Cubiculo {
   nombre: string | null
   descripcion?: string | null
   entidadId?: string | null
-  estatusCubiculo: string
+  /** ID en catálogo `estatus_cubiculo_medico` (campo Firestore: estatusCubiculoId). */
+  estatusCubiculoId?: string | null
+  /** Legacy — algunos docs antiguos usan este nombre de campo. */
+  estatusCubiculo?: string
   ordenMostrar: number | null
   activo: boolean
 }
@@ -89,8 +92,22 @@ export interface Medico {
 export interface Empresa {
   id: string
   nombre: string
+  descripcion?: string | null
+  alias?: string | null
+  ordenMostrar?: number | null
   activo: boolean
 }
+
+/** Especialidad médica (colección `especialidades`). */
+export interface Especialidad {
+  id: string
+  nombre: string
+  descripcion?: string | null
+  activo: boolean
+}
+
+/** Colecciones editables en Mantenimiento de Catálogos (Fase 2). */
+export type CatalogMaintenanceCollection = 'cubiculos' | 'empresas' | 'especialidades'
 
 /** Estudio (colección `estudios`). */
 export interface Estudio {
