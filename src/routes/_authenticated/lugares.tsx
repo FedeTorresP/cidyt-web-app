@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -35,9 +35,9 @@ function MedicoDiaPage() {
   const [queryFecha, setQueryFecha] = useState(todayMX)
 
   // ── Catálogos ──────────────────────────────────────────────────────────────
-  const { data: medicos, isLoading: loadingMedicos } = useMedicosActivos()
-  const { data: lugares, isLoading: loadingLugares } = useLugaresActivos()
-  const { data: horarios, isLoading: loadingHorarios } = useHorariosActivos()
+  const { data: medicos, isLoading: loadingMedicos, isError: errorMedicos, error: medicosError } = useMedicosActivos()
+  const { data: lugares, isLoading: loadingLugares, isError: errorLugares, error: lugaresError } = useLugaresActivos()
+  const { data: horarios, isLoading: loadingHorarios, isError: errorHorarios, error: horariosError } = useHorariosActivos()
 
   // ── Asignaciones del día ───────────────────────────────────────────────────
   const {
@@ -51,6 +51,19 @@ function MedicoDiaPage() {
   const eliminarMutation = useEliminarAsignacion()
 
   const catalogosLoading = loadingMedicos || loadingLugares || loadingHorarios
+  const catalogosError = errorMedicos || errorLugares || errorHorarios
+  const catalogosErrorMessage =
+    (medicosError instanceof Error && medicosError.message) ||
+    (lugaresError instanceof Error && lugaresError.message) ||
+    (horariosError instanceof Error && horariosError.message) ||
+    'No se pudieron cargar los catálogos desde Firestore.'
+
+  useEffect(() => {
+    if (catalogosError) {
+      console.error('[Lugares] Error cargando catálogos:', { medicosError, lugaresError, horariosError })
+      toast.error(catalogosErrorMessage)
+    }
+  }, [catalogosError, catalogosErrorMessage, medicosError, lugaresError, horariosError])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -77,7 +90,7 @@ function MedicoDiaPage() {
     crearMutation.mutate(
       {
         medicoId: formMedicoId,
-        lugarId: formLugarId,
+        lugarEstudioId: formLugarId,
         horarioId: formHorarioId,
         fecha: formFecha,
         creadoPor: user?.email ?? user?.uid ?? 'unknown',
@@ -135,6 +148,10 @@ function MedicoDiaPage() {
             <div className="flex justify-center py-6">
               <LoadingSpinner size="md" />
             </div>
+          ) : catalogosError ? (
+            <p className="text-sm text-red-600">
+              Error al cargar catálogos: {catalogosErrorMessage}
+            </p>
           ) : (
             <form onSubmit={handleSubmit} noValidate>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -157,7 +174,7 @@ function MedicoDiaPage() {
                     <option value="">— Seleccione médico —</option>
                     {medicos?.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.nombreCompleto ?? `Médico #${m.id}`}
+                        {m.letra ? `${m.letra} — ${m.nombreCompleto ?? `Médico #${m.id}`}` : (m.nombreCompleto ?? `Médico #${m.id}`)}
                       </option>
                     ))}
                   </select>
@@ -321,7 +338,14 @@ function MedicoDiaPage() {
                       }
                     >
                       <td className="px-3 py-2 border-b border-[var(--color-borde)] whitespace-nowrap">
-                        {asig.medicoNombre}
+                        {asig.medicoLetra ? (
+                          <>
+                            <span className="font-bold text-[var(--color-primario)] mr-1">{asig.medicoLetra}</span>
+                            {asig.medicoNombre}
+                          </>
+                        ) : (
+                          asig.medicoNombre
+                        )}
                       </td>
                       <td className="px-3 py-2 border-b border-[var(--color-borde)] whitespace-nowrap">
                         {asig.lugarNombre}

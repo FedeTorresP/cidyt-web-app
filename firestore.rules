@@ -1,0 +1,200 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Custom claims from create-admin.mjs: permissions: ['*']
+    function isSuperAdmin() {
+      return isAuth()
+        && request.auth.token.permissions is list
+        && '*' in request.auth.token.permissions;
+    }
+
+    // ─── Catálogos estáticos ───────────────────────────────────────────────
+    // Lectura: cualquier usuario autenticado.
+    // Escritura: solo super admin (seed / mantenimiento).
+
+    match /menu_items/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /estudios/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /estudio_tipo/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /estatus_estudio/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /estatus_cubiculo_medico/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /estatus_val_pac/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /especialidades/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /lugar_estudio/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /padecimientos/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /horarios/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /empresas/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /medicos/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /cubiculos/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /paquetes/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /promotores/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /perfiles/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /roles/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /permisos/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /rol_permisos/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /entidades/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /medico_especialidad/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /medico_lugar_estudio/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /paquete_detalle/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /prestaciones/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /paquete_prestacion/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    // ─── Datos operacionales ───────────────────────────────────────────────
+    // Lectura/escritura para usuarios autenticados (refinar por rol en fases posteriores).
+
+    match /medico_lugar_dia/{docId} {
+      allow read, create, update: if isAuth();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /sesiones_cubiculo/{docId} {
+      allow read, create, update: if isAuth();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /pacientes/{docId} {
+      allow read, create, update: if isAuth();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /seguimientos/{docId} {
+      allow read, create, update: if isAuth();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /estudios_paciente/{docId} {
+      allow read, create, update: if isAuth();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /val_corporal/{docId} {
+      allow read, create, update: if isAuth();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /facturas/{docId} {
+      allow read, create, update: if isAuth();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /interface_sap/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    // Perfiles de app — lectura propia; alta/edición solo admin
+    match /usuarios/{docId} {
+      allow read: if isAuth();
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /audit_log/{docId} {
+      allow create: if isAuth();
+      allow read, update, delete: if isSuperAdmin();
+    }
+  }
+}

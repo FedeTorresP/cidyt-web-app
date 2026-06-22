@@ -1,35 +1,28 @@
 import { useQuery } from '@tanstack/react-query'
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-} from 'firebase/firestore'
-import { getFirebaseFirestore } from '@/lib/firebase'
+import { useAuth } from '@/hooks/use-auth'
+import { fetchActiveCatalog, sortByNombre } from '@/lib/firestore-catalog'
+import type { LugarEstudio } from '@/types/models'
 
-export interface LugarActivo {
-  id: string
-  nombre: string
-}
+/** Área/rama activa — lee la colección Firestore `lugar_estudio`. */
+export type LugarActivo = Pick<LugarEstudio, 'id' | 'nombre'>
 
-async function fetchLugaresActivos(): Promise<LugarActivo[]> {
-  const db = getFirebaseFirestore()
-  const lugaresQuery = query(
-    collection(db, 'lugares'),
-    where('activo', '==', true),
-    orderBy('nombre', 'asc'),
+async function fetchLugaresEstudioActivos(): Promise<LugarActivo[]> {
+  return fetchActiveCatalog(
+    'lugar_estudio',
+    (id, data) => ({
+      id,
+      nombre: String(data.nombre ?? ''),
+    }),
+    sortByNombre,
   )
-  const snapshot = await getDocs(lugaresQuery)
-  return snapshot.docs.map((d) => ({
-    id: d.id,
-    nombre: d.data().nombre ?? '',
-  }))
 }
 
 export function useLugaresActivos() {
+  const { user, loading: authLoading } = useAuth()
+
   return useQuery({
-    queryKey: ['lugares-activos'],
-    queryFn: fetchLugaresActivos,
+    queryKey: ['lugar-estudio-activos'],
+    queryFn: fetchLugaresEstudioActivos,
+    enabled: !!user && !authLoading,
   })
 }

@@ -80,6 +80,8 @@ export interface SesionCubiculo {
 export interface Medico {
   id: string
   nombreCompleto: string | null
+  /** Identificador corto mostrado en celdas de la matriz (legacy: Nombre_Corto). */
+  letra: string | null
   activo: boolean
 }
 
@@ -96,6 +98,8 @@ export interface Estudio {
   nombre: string
   abreviatura?: string
   estudioTipoId?: string
+  /** Área/rama (`lugar_estudio`) donde se asigna médico; null si no aplica. */
+  lugarEstudioId?: string | null
   activo: boolean
   ordenMostrar?: number
 }
@@ -107,6 +111,9 @@ export interface EstudioPaciente {
   estudioId: string
   estudioTipoId?: string | null
   estatusEstudioId: string
+  medicoId?: string | null
+  /** Letra del médico asignado (legacy: Letra_Est_Adic). */
+  letraMedico?: string | null
   activo: boolean
 }
 
@@ -152,10 +159,22 @@ export interface Horario {
   activo: boolean
 }
 
-/** Lugar (colección `lugares`). */
-export interface Lugar {
+/** Área/rama de estudio (colección `lugar_estudio`). */
+export interface LugarEstudio {
   id: string
   nombre: string
+  descripcion?: string | null
+  activo: boolean
+}
+
+/** @deprecated Usar `LugarEstudio` — alias conservado por compatibilidad. */
+export type Lugar = LugarEstudio
+
+/** Relación médico ↔ área de estudio (colección `medico_lugar_estudio`). */
+export interface MedicoLugarEstudio {
+  id: string
+  medicoId: string
+  lugarEstudioId: string
   activo: boolean
 }
 
@@ -168,11 +187,12 @@ export interface Paquete {
   activo: boolean
 }
 
-/** Asignación médico-lugar-día (colección `medico_lugar_dia`). */
+/** Asistencia diaria médico ↔ área (colección `medico_lugar_dia`). */
 export interface MedicoLugarDia {
   id: string
   medicoId: string
-  lugarId: string
+  /** ID del documento en `lugar_estudio`. */
+  lugarEstudioId: string
   horarioId: string
   fecha: string
   activo: boolean

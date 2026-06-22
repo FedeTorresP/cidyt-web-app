@@ -1,12 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-} from 'firebase/firestore'
-import { getFirebaseFirestore } from '@/lib/firebase'
+import { useAuth } from '@/hooks/use-auth'
+import { fetchActiveCatalog, sortByNombre } from '@/lib/firestore-catalog'
 
 export interface HorarioActivo {
   id: string
@@ -14,22 +8,22 @@ export interface HorarioActivo {
 }
 
 async function fetchHorariosActivos(): Promise<HorarioActivo[]> {
-  const db = getFirebaseFirestore()
-  const horariosQuery = query(
-    collection(db, 'horarios'),
-    where('activo', '==', true),
-    orderBy('nombre', 'asc'),
+  return fetchActiveCatalog(
+    'horarios',
+    (id, data) => ({
+      id,
+      nombre: String(data.nombre ?? ''),
+    }),
+    sortByNombre,
   )
-  const snapshot = await getDocs(horariosQuery)
-  return snapshot.docs.map((d) => ({
-    id: d.id,
-    nombre: d.data().nombre ?? '',
-  }))
 }
 
 export function useHorariosActivos() {
+  const { user, loading: authLoading } = useAuth()
+
   return useQuery({
     queryKey: ['horarios-activos'],
     queryFn: fetchHorariosActivos,
+    enabled: !!user && !authLoading,
   })
 }

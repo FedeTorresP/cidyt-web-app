@@ -5,6 +5,37 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.4.0] — 2026-06-22
+
+### Fase 0 — Alineación de catálogos Firestore (post-PWA / post-seed)
+
+Tras **[3.3.0]** (PWA + seed de ~10k documentos desde IPADCK), la app seguía leyendo colecciones y campos distintos a los sembrados, y las **Firestore Security Rules** no permitían lectura desde el cliente. Esta versión cierra esa brecha para habilitar la asignación de médicos por letra (Fase 1).
+
+#### Agregado
+- **`firestore.rules`**: reglas de seguridad desplegadas en `ipad-cidyt`
+  - Lectura de catálogos para cualquier usuario autenticado
+  - Escritura de catálogos solo super admin (`permissions: ['*']`)
+  - Lectura/escritura operacional (`medico_lugar_dia`, `seguimientos`, `estudios_paciente`, etc.) para usuarios autenticados
+- **`firestore.indexes.json`**: índices compuestos para `menu_items`, `medico_lugar_dia`, `seguimientos`, `estudios_paciente`
+- **`src/lib/firestore-catalog.ts`**: helper `fetchActiveCatalog()` — consultas sin `orderBy` en servidor (evita índices compuestos innecesarios), orden en cliente
+- **Hook `use-estudios.ts`**: catálogo `estudios` con `lugarEstudioId` + `buildEstudioLugarMap()`
+- **Hook `use-medico-lugar-estudio.ts`**: tabla puente `medico_lugar_estudio` + `buildMedicosPorLugarEstudio()`
+
+#### Modificado
+- **`firebase.json`**: configuración Firestore (rules + indexes) junto al hosting existente
+- **`src/types/models.ts`**: `Medico.letra`, `Estudio.lugarEstudioId`, `EstudioPaciente.medicoId` / `letraMedico`, `LugarEstudio`, `MedicoLugarEstudio`; `MedicoLugarDia.lugarEstudioId` (antes `lugarId`)
+- **`use-lugares.ts`**: lee `lugar_estudio` (ya no la colección inexistente `lugares`); espera sesión auth
+- **`use-medicos.ts`**: expone campo `letra`; espera sesión auth
+- **`use-horarios.ts`**: consulta vía `fetchActiveCatalog`; espera sesión auth
+- **`use-medico-dia.ts`**: resuelve nombres desde `lugar_estudio`; escribe `lugarEstudioId`; compatibilidad lectura con `lugarId` legacy; `buildMedicosPresentesPorLugar()`
+- **`lugares.tsx`**: dropdown de médicos con letra; tabla muestra letra; toast/mensaje si falla carga de catálogos
+
+#### Corregido
+- Dropdowns vacíos en `/lugares` por `Missing or insufficient permissions` (reglas Firestore ausentes/restrictivas) — **no relacionado con sap-pipeline** (Admin SDK bypassa reglas; el cliente no)
+- Consultas de catálogo que fallaban silenciosamente por índices compuestos (`where` + `orderBy`) no creados
+
+---
+
 ## [3.3.0] — 2026-06-19
 
 ### PWA + Seed de Catálogos Firestore

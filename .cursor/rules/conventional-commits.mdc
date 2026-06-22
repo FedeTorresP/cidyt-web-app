@@ -1,0 +1,71 @@
+---
+description: Use Conventional Commits for all git commit messages in this project
+alwaysApply: true
+---
+
+# Conventional Commits
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) for every commit message in this project.
+
+## Format
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+- **type**: required — what kind of change this is
+- **scope**: optional — affected area (e.g. `auth`, `lista-dia`, `pwa`)
+- **description**: required — imperative, lowercase, no trailing period, max ~72 chars
+- **body**: optional — explain the why, not the what
+- **footer**: optional — breaking changes, issue refs (`Closes #123`)
+
+## Allowed types
+
+| Type | Use when |
+|------|----------|
+| `feat` | New feature or user-visible capability |
+| `fix` | Bug fix |
+| `refactor` | Code change without fixing a bug or adding a feature |
+| `style` | Formatting, whitespace, semicolons (no logic change) |
+| `perf` | Performance improvement |
+| `test` | Adding or updating tests |
+| `build` | Build system, dependencies, CI |
+| `ci` | CI/CD configuration |
+| `chore` | Maintenance, tooling, non-production code |
+| `docs` | Documentation only |
+| `revert` | Reverts a previous commit |
+
+## Rules
+
+- Write the subject in **imperative mood**: `add auth gate`, not `added auth gate`
+- Keep the subject concise; put detail in the body if needed
+- Use `!` after type/scope for breaking changes: `feat(api)!: remove legacy endpoint`
+- Match the repository's existing commit style when in doubt
+
+## Examples
+
+```
+feat(pwa): add service worker update toast on deploy
+```
+
+```
+fix(auth): wait for firebase session before route redirect
+```
+
+```
+refactor(lista-dia): replace invisible selects with tactile status cells
+```
+
+```
+chore(deps): add framer-motion for ipad microinteractions
+```
+
+## Do not
+
+- Use vague messages: `update files`, `wip`, `fixes`
+- Mix unrelated changes in one commit
+- Commit secrets (`.env`, credentials)
