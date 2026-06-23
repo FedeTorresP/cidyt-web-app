@@ -5,6 +5,22 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.6.2] — 2026-06-23
+
+### Seguridad — cierre de sesión por inactividad (iPads compartidos)
+
+Tras **[3.6.1]**, esta versión evita que un usuario distinto herede la sesión Firebase de quien dejó el iPad sin cerrar sesión explícita.
+
+#### Agregado
+- **`endSession()`** en `src/services/session.ts`: cierre centralizado — Firebase `signOut`, limpieza de `cidyt_turno` en `sessionStorage` y `queryClient.clear()`
+- **Hook `use-inactivity-logout`**: timer de **30 minutos** sin interacción (`pointerdown`, `keydown`, `touchstart`, `click`, `scroll`) en rutas autenticadas
+
+#### Modificado
+- **`AppShell.tsx`**: botón Salir y timeout de inactividad comparten `endSession()`; guard anti doble logout
+- **`login.tsx`**: "Regresar" en paso de turno también ejecuta `endSession()` (no solo `signOut`)
+
+---
+
 ## [3.6.1] — 2026-06-22 [`13d4418`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/13d4418)
 
 ### Letra de médico en Lista Cubículos + pulido Mantenimiento Catálogos

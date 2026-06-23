@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { Outlet, useNavigate, useLocation } from '@tanstack/react-router'
 import { useAuth } from '@/hooks/use-auth'
+import { useInactivityLogout } from '@/hooks/use-inactivity-logout'
 import { useMenu } from '@/hooks/use-menu'
-import { logout } from '@/services/auth'
+import { endSession } from '@/services/session'
 import { SidebarNav } from './SidebarNav'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { AlertBanner } from '@/components/shared/AlertBanner'
@@ -27,14 +28,19 @@ export function AppShell() {
     ? sessionStorage.getItem('cidyt_turno')
     : null
 
-  const handleLogout = async () => {
+  const loggingOutRef = useRef(false)
+
+  const handleLogout = useCallback(async () => {
+    if (loggingOutRef.current) return
+    loggingOutRef.current = true
     try {
-      await logout()
+      await endSession()
     } finally {
-      sessionStorage.removeItem('cidyt_turno')
       navigate({ to: '/login' })
     }
-  }
+  }, [navigate])
+
+  useInactivityLogout(handleLogout)
 
   return (
     <div className="flex flex-row" style={{ minHeight: '100dvh' }}>

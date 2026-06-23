@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useRef } from 'react'
-import { loginWithEmail, logout, GENERIC_AUTH_ERROR } from '@/services/auth'
+import { loginWithEmail, GENERIC_AUTH_ERROR } from '@/services/auth'
+import { endSession } from '@/services/session'
 import { useAuth } from '@/hooks/use-auth'
 import { AlertBanner } from '@/components/shared/AlertBanner'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -103,7 +104,7 @@ function LoginPage() {
   }
 
   async function handleBack() {
-    await logout()
+    await endSession()
     setStep('credentials')
     setSelectedTurno(null)
     setError(null)
