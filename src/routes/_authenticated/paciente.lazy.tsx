@@ -5,7 +5,6 @@ import {
   usePacientesDelDia,
   useCatalogos,
   usePacienteDetalle,
-  useCrearPaciente,
   useEditarPaciente,
   useToggleActivo,
 } from '@/hooks/use-registro-pacientes'
@@ -54,7 +53,6 @@ function RegistroPacientesPage() {
   const { data: detalle } = usePacienteDetalle(editandoId)
 
   // Mutations
-  const crearMut = useCrearPaciente()
   const editarMut = useEditarPaciente()
   const toggleMut = useToggleActivo()
 
@@ -89,14 +87,6 @@ function RegistroPacientesPage() {
   }, [successMsg, errorMsg])
 
   // Handlers
-  const handleNuevo = useCallback(() => {
-    setEditandoId(null)
-    setForm(EMPTY_FORM)
-    setVista('formulario')
-    setSuccessMsg('')
-    setErrorMsg('')
-  }, [])
-
   const handleEditar = useCallback((pac: PacienteRegistro) => {
     setEditandoId(pac.seguimientoId)
     setVista('formulario')
@@ -117,22 +107,18 @@ function RegistroPacientesPage() {
     setSuccessMsg('')
     setErrorMsg('')
 
+    if (!editandoId) return
+
     try {
-      if (editandoId) {
-        await editarMut.mutateAsync({ seguimientoId: editandoId, data: form })
-        setSuccessMsg('Paciente actualizado correctamente.')
-        setVista('lista')
-        setEditandoId(null)
-        setForm(EMPTY_FORM)
-      } else {
-        await crearMut.mutateAsync(form)
-        setSuccessMsg('Paciente registrado correctamente.')
-        setForm(EMPTY_FORM)
-      }
+      await editarMut.mutateAsync({ seguimientoId: editandoId, data: form })
+      setSuccessMsg('Paciente actualizado correctamente.')
+      setVista('lista')
+      setEditandoId(null)
+      setForm(EMPTY_FORM)
     } catch {
-      setErrorMsg(editandoId ? 'Error al actualizar paciente.' : 'Error al registrar paciente.')
+      setErrorMsg('Error al actualizar paciente.')
     }
-  }, [editandoId, form, crearMut, editarMut])
+  }, [editandoId, form, editarMut])
 
   const handleCancelar = useCallback(async (seguimientoId: string) => {
     try {
@@ -168,29 +154,10 @@ function RegistroPacientesPage() {
      RENDER — VISTA LISTA
      ═══════════════════════════════════════════════════════════════════════ */
 
-  if (vista === 'lista') {
+  if (vista === 'lista' || !editandoId) {
     return (
       <div>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h1 className="page-title" style={{ marginBottom: 0 }}>Registro de Pacientes</h1>
-          <button
-            onClick={handleNuevo}
-            style={{
-              backgroundColor: 'var(--color-acento)',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              padding: '0 20px',
-              minHeight: '40px',
-              borderRadius: 'var(--radius-default)',
-              border: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            + Nuevo Paciente
-          </button>
-        </div>
+        <h1 className="page-title">Registro de Pacientes</h1>
 
         {/* Toast mensajes */}
         {successMsg && (
@@ -421,14 +388,14 @@ function RegistroPacientesPage() {
      RENDER — VISTA FORMULARIO
      ═══════════════════════════════════════════════════════════════════════ */
 
-  const isSubmitting = crearMut.isPending || editarMut.isPending
+  const isSubmitting = editarMut.isPending
 
   return (
     <div>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
         <h1 className="page-title" style={{ marginBottom: 0 }}>
-          {editandoId ? `Editando Paciente #${editandoId}` : 'Nuevo Paciente'}
+          {`Editando Paciente #${editandoId}`}
         </h1>
         <button
           onClick={handleVolver}
@@ -633,19 +600,14 @@ function RegistroPacientesPage() {
               fontSize: '1rem',
               fontWeight: 600,
               color: '#ffffff',
-              backgroundColor: editandoId ? 'var(--color-primario)' : 'var(--color-acento)',
+              backgroundColor: 'var(--color-primario)',
               borderRadius: 'var(--radius-default)',
               border: 'none',
               cursor: isSubmitting ? 'not-allowed' : 'pointer',
               opacity: isSubmitting ? 0.6 : 1,
             }}
           >
-            {isSubmitting
-              ? 'Procesando...'
-              : editandoId
-                ? 'Guardar Cambios'
-                : 'Registrar Paciente'
-            }
+            {isSubmitting ? 'Procesando...' : 'Guardar Cambios'}
           </button>
         </form>
       </div>

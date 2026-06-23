@@ -5,6 +5,22 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.6.3] — 2026-06-23
+
+### Registro de Pacientes — sin alta manual (fuente SAP)
+
+Los pacientes se ingresan desde SAP; la app solo consulta, edita y cancela/restaura registros existentes.
+
+#### Eliminado
+- **Botón "+ Nuevo Paciente"** en `/paciente`
+- **Flujo de alta manual**: formulario de paciente nuevo y mutation `useCrearPaciente` (`POST /api/pacientes`)
+
+#### Modificado
+- **`paciente.lazy.tsx`**: el formulario queda disponible solo vía **Editar** en pacientes del día
+- **`use-registro-pacientes.ts`**: removido `useCrearPaciente`; conservadas edición y toggle activo/cancelado
+
+---
+
 ## [3.6.2] — 2026-06-23
 
 ### Seguridad — cierre de sesión por inactividad (iPads compartidos)

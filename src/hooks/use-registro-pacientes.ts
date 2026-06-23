@@ -200,37 +200,6 @@ export function usePacienteDetalle(seguimientoId: string | null) {
   })
 }
 
-export function useCrearPaciente() {
-  const qc = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (data: PacienteFormData) => {
-      const headers = await getAuthHeaders()
-      const res = await fetch(`${API_BASE}/api/pacientes`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          Primer_Nombre: data.primerNombre.trim().toUpperCase(),
-          Segundo_Nombre: data.segundoNombre.trim().toUpperCase(),
-          Apellido_Paterno: data.apellidoPaterno.trim().toUpperCase(),
-          Apellido_Materno: data.apellidoMaterno.trim().toUpperCase(),
-          Fecha_Nac: data.fechaNac,
-          Genero: data.genero,
-          Historia: data.historia.trim().toUpperCase(),
-          Paquete_id: data.paqueteId,
-          Empresa_id: Number(data.empresaId),
-          Turno: Number(data.turno),
-        }),
-      })
-      if (!res.ok) throw new Error('Error al registrar paciente')
-      return await res.json()
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['registro-pacientes'] })
-    },
-  })
-}
-
 export function useEditarPaciente() {
   const qc = useQueryClient()
 
