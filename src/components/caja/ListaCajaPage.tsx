@@ -1,16 +1,8 @@
-import { createLazyFileRoute, Link } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { nowMX, formatDateMX } from '@/lib/timezone'
 import { useListaCaja } from '@/hooks/use-lista-caja'
-
-export const Route = createLazyFileRoute('/_authenticated/lista-caja')({
-  component: ListaCajaPage,
-})
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   CONSTANTES — Estudios, Estatus, Desayuno, Colores
-   ═══════════════════════════════════════════════════════════════════════════ */
 
 /** Los 20 estudios del sistema en orden de columna. */
 const ESTUDIOS_COLUMNAS = [
@@ -36,7 +28,6 @@ const ESTUDIOS_COLUMNAS = [
   { id: 20, abrev: 'FIB', nombre: 'Fibroscopía' },
 ] as const
 
-/** Estatus de estudio — colores y letra para cuadro sólido (READ-ONLY). */
 const ESTATUS_ESTUDIO = [
   { id: 0, nombre: 'Sin Estatus', color: '#9ca3af', letra: '', esBorde: false },
   { id: 1, nombre: 'No Incluido', color: '#374151', letra: '', esBorde: false },
@@ -49,25 +40,19 @@ const ESTATUS_ESTUDIO = [
   { id: 8, nombre: 'Estudio Combinado', color: '#873600', letra: '', esBorde: false },
 ] as const
 
-/** Desayuno — texto coloreado read-only. */
 const DESAYUNO_MAP = [
   { value: 0, label: 'No', color: '#D32F2F' },
   { value: 1, label: 'En', color: '#F57C00' },
   { value: 2, label: 'Sí', color: '#00A651' },
 ] as const
 
-/** Tarjeta Entrega Resultados — texto coloreado read-only. */
 const TARJETA_MAP: Record<number, { label: string; color: string }> = {
   0: { label: 'No', color: '#D32F2F' },
   1: { label: 'Sí', color: '#00A651' },
   2: { label: 'Env', color: '#1976D2' },
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   COMPONENTE PRINCIPAL — ListaCajaPage
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function ListaCajaPage() {
+export function ListaCajaPage() {
   const hoy = formatDateMX(nowMX())
   const [fecha, setFecha] = useState(() => hoy)
   const { data: pacientes = [], refetch } = useListaCaja(fecha)
@@ -98,7 +83,6 @@ function ListaCajaPage() {
     <div className="text-[0.8rem]">
       <h1 className="page-title">Lista de Estudios — Caja</h1>
 
-      {/* ── Toolbar ── */}
       <div
         ref={toolbarRef}
         className="sticky top-0 z-20"
@@ -156,7 +140,6 @@ function ListaCajaPage() {
         </span>
       </div>
 
-      {/* ── Tabla ── */}
       {pacientes.length === 0 ? (
         <div className="bg-[var(--color-fondo-card)] rounded-[var(--radius-default)] shadow-[var(--shadow-card)] p-10 text-center text-[var(--color-texto-suave)] text-sm">
           No hay pacientes para esta fecha.
@@ -166,37 +149,30 @@ function ListaCajaPage() {
           <table className="border-collapse bg-[var(--color-fondo-card)]" style={{ minWidth: '100%', tableLayout: 'fixed' }}>
             <thead className="z-10" style={{ position: 'sticky', top: `${toolbarHeight}px`, backgroundColor: 'var(--color-primario)' }}>
               <tr>
-                {/* Turno — sticky */}
                 <th
                   className="sticky left-0 z-[11] py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12"
                   style={{ width: '40px', backgroundColor: 'var(--color-primario)', borderTopLeftRadius: '10px' }}
                 >
                   T
                 </th>
-                {/* Nombre — sticky */}
                 <th
                   className="sticky z-[11] py-1.5 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12"
                   style={{ left: '40px', width: '160px', paddingLeft: '6px', backgroundColor: 'var(--color-primario)' }}
                 >
                   Nombre del Paciente
                 </th>
-                {/* Edad */}
                 <th className="py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '38px' }}>
                   Edad
                 </th>
-                {/* Paquete */}
                 <th className="py-1.5 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '180px', paddingLeft: '6px' }}>
                   Paquete
                 </th>
-                {/* Peso */}
                 <th className="py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '48px' }}>
                   Peso
                 </th>
-                {/* Talla */}
                 <th className="py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '48px' }}>
                   Talla
                 </th>
-                {/* Desayuno */}
                 <th className="py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '40px' }}>
                   <div className="flex flex-col items-center justify-center h-[32px]">
                     <span className="inline-block whitespace-nowrap text-[0.65rem] font-bold tracking-wide -rotate-45 origin-center leading-none">
@@ -204,7 +180,6 @@ function ListaCajaPage() {
                     </span>
                   </div>
                 </th>
-                {/* Tarjeta */}
                 <th className="py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12" style={{ width: '40px' }}>
                   <div className="flex flex-col items-center justify-center h-[32px]">
                     <span className="inline-block whitespace-nowrap text-[0.65rem] font-bold tracking-wide -rotate-45 origin-center leading-none">
@@ -212,7 +187,6 @@ function ListaCajaPage() {
                     </span>
                   </div>
                 </th>
-                {/* Columnas de estudios */}
                 {ESTUDIOS_COLUMNAS.map((est) => (
                   <th
                     key={est.id}
@@ -227,7 +201,6 @@ function ListaCajaPage() {
                     </div>
                   </th>
                 ))}
-                {/* Médico Internista */}
                 <th
                   className="py-1.5 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12"
                   style={{ width: '160px', paddingLeft: '6px', borderTopRightRadius: '10px' }}
@@ -241,18 +214,13 @@ function ListaCajaPage() {
                 const completo = pac.estatusValpac === 2
                 const listoParaSalir = pac.estatusValpac === 1
                 const rowBgBase = idx % 2 === 0 ? 'var(--color-fondo)' : 'var(--color-fondo-card)'
-
-                // Color de celda Turno
                 const turnoBg = completo ? 'rgba(0, 130, 180, 0.30)' : rowBgBase
-
-                // Color de celda Nombre
                 const nombreBg = (completo || listoParaSalir)
                   ? 'rgba(0, 166, 81, 0.28)'
                   : rowBgBase
 
                 return (
                   <tr key={pac.seguimientoId} style={{ backgroundColor: rowBgBase }}>
-                    {/* Turno — sticky */}
                     <td
                       className="sticky left-0 z-[9] px-0 py-[2px] text-center border-b border-b-[var(--color-borde)]"
                       style={{ backgroundColor: turnoBg }}
@@ -261,7 +229,6 @@ function ListaCajaPage() {
                         {pac.turno}
                       </span>
                     </td>
-                    {/* Nombre — sticky, link a /caja/$seguimientoId */}
                     <td
                       className="sticky z-[9] py-[2px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden"
                       style={{ left: '40px', backgroundColor: nombreBg, paddingLeft: '5px' }}
@@ -275,23 +242,18 @@ function ListaCajaPage() {
                         {pac.nombre}
                       </Link>
                     </td>
-                    {/* Edad */}
                     <td className="px-0 py-[2px] text-center border-b border-b-[var(--color-borde)] text-[0.7rem]">
                       {pac.edad ?? '—'}
                     </td>
-                    {/* Paquete */}
                     <td className="py-[2px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden" style={{ paddingLeft: '6px' }}>
                       {pac.paqueteNombre ?? '—'}
                     </td>
-                    {/* Peso */}
                     <td className="px-0 py-[2px] text-center border-b border-b-[var(--color-borde)] text-[0.7rem]">
                       {(pac.peso ?? 0).toFixed(2)}
                     </td>
-                    {/* Talla */}
                     <td className="px-0 py-[2px] text-center border-b border-b-[var(--color-borde)] text-[0.7rem]">
                       {(pac.talla ?? 0).toFixed(2)}
                     </td>
-                    {/* Desayuno — badge read-only */}
                     <td className="px-0 py-[2px] text-center border-b border-b-[var(--color-borde)] align-middle">
                       <span
                         style={{
@@ -303,7 +265,6 @@ function ListaCajaPage() {
                         {DESAYUNO_MAP[pac.desayuno].label}
                       </span>
                     </td>
-                    {/* Tarjeta Ent. Res. — badge read-only */}
                     <td className="px-0 py-[2px] text-center border-b border-b-[var(--color-borde)] align-middle">
                       {pac.tarjetaEntRes != null ? (
                         <span
@@ -319,7 +280,6 @@ function ListaCajaPage() {
                         <span style={{ color: 'var(--color-texto-suave)', fontSize: '0.7rem' }}>—</span>
                       )}
                     </td>
-                    {/* Celdas de estudios — cuadros sólidos READ-ONLY */}
                     {ESTUDIOS_COLUMNAS.map((est) => {
                       const estatusId = pac.estudios[est.id] ?? 0
                       const estatus = ESTATUS_ESTUDIO.find((e) => e.id === estatusId) ?? ESTATUS_ESTUDIO[0]
@@ -347,7 +307,6 @@ function ListaCajaPage() {
                         </td>
                       )
                     })}
-                    {/* Médico Internista */}
                     <td className="py-[2px] border-b border-b-[var(--color-borde)] whitespace-normal break-words text-[0.7rem] leading-tight overflow-hidden" style={{ paddingLeft: '6px' }}>
                       {pac.medicoInternista ?? <span className="text-[var(--color-texto-suave)]">SIN ASIGNAR</span>}
                     </td>
