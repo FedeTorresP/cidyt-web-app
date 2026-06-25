@@ -23,6 +23,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ─── Setup Node (pin to avoid node-fetch auth bug on Node 24.17+) ────
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.3'
+
       # ─── Authenticate with GCP ──────────────────────────────────────────
       - name: Authenticate to Google Cloud
         id: auth
@@ -87,7 +93,7 @@ jobs:
       - name: Deploy to Firebase Hosting
         run: |
           echo "::group::Firebase Deploy"
-          npx firebase-tools deploy \
+          npx firebase-tools@15.22.1 deploy \
             --only hosting \
             --project ${{ env.PROJECT_ID }} \
             --message "Deploy ${{ github.sha }} by ${{ github.actor }}" \
