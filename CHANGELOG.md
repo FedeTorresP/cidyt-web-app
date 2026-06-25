@@ -5,6 +5,31 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.7.0] — 2026-06-25
+
+### Integración SAP — Cloud Function relay hacia sap-pipeline On-Premise
+
+Cierra la integración del microservicio `sap-pipeline`. SAP (al confirmar una cita/admisión) llama una Cloud Function HTTPS pública que reenvía el payload, por red privada, al `sap-pipeline` On-Premise (`POST /patients`), que valida y escribe en Firestore para que el web app lo muestre.
+
+```
+SAP ECC (On-Premise) → Cloud Function (gen2, HTTPS) → [VPC core-red-compartida] → sap-pipeline On-Premise → Firestore → web app
+```
+
+#### Agregado
+- **Cloud Function `relay_sap_to_onprem`** (`functions/main.py`, gen2 Python): relay HTTPS con egress privado (`vpc_connector` + `PRIVATE_RANGES_ONLY`) hacia la **VPC compartida `core-red-compartida`**. Passthrough del status/cuerpo real del pipeline a SAP; manejo de timeout (504) y error de conexión (502)
+- **Seguridad de entrada**: autenticación por header `X-API-Key` contra el secret `SAP_INBOUND_API_KEY` (Firebase Secret Manager), comparación en tiempo constante y **fail-closed**
+- **Seguridad de salida**: auth opcional al On-Premise (`ON_PREM_AUTH_HEADER` + secret `ON_PREM_AUTH_VALUE`)
+- **`functions/`**: `requirements.txt`, `.env.example`, `README.md` (flujo, seguridad, APIs, prueba local) y `setup_vpc_connector.sh` para crear el conector de Serverless VPC Access en el host project de la Shared VPC
+- **APIs habilitadas** en `ipad-cidyt`: `vpcaccess` (ya estaban `cloudfunctions`, `run`, `cloudbuild`, `artifactregistry`)
+
+#### Modificado
+- **`firebase.json`**: registrado el codebase de `functions` (runtime `python313`)
+
+#### Eliminado
+- **Regla obsoleta `interface_sap`** en `firestore.rules`: el diseño basado en disparador Firestore se reemplazó por el relay HTTP (la fuente de verdad es SAP, no el web app)
+
+---
+
 ## [3.6.3] — 2026-06-23
 
 ### Registro de Pacientes — sin alta manual (fuente SAP)

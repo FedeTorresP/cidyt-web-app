@@ -187,11 +187,6 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
-    match /interface_sap/{docId} {
-      allow read: if isAuth();
-      allow write: if isSuperAdmin();
-    }
-
     // Perfiles de app — lectura propia; alta/edición solo admin
     match /usuarios/{docId} {
       allow read: if isAuth();

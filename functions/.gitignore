@@ -1,0 +1,14 @@
+# Python venv que Firebase crea para deploy/emulación
+venv/
+__pycache__/
+*.pyc
+
+# Variables de entorno locales (NO subir secretos)
+.env
+.env.*.local
+.env.local
+
+# Logs del emulador / CLI
+firebase-debug.log
+firebase-debug.*.log
+*.local
