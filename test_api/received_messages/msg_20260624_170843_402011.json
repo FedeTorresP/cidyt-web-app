@@ -1,0 +1,9 @@
+{
+  "message": {
+    "type": "Import"
+  },
+  "patient": {
+    "patNombre1": "ANA",
+    "patApePat": "NÚÑEZ"
+  }
+}

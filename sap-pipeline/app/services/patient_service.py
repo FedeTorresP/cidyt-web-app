@@ -1,6 +1,13 @@
 """Servicio de pacientes — equivale a CargaXml + CargaDatosPacInterface.
 
-Flujo por paciente (recibido como JSON desde SAP):
+La operación se deriva de `message.event` de SAP:
+  - INSERT (Insertpatient): alta completa con dedup por No_Cita.
+  - UPDATE (Updatepatient): actualiza datos del paciente/cita existente;
+    si la cita no existe, se trata como alta (upsert).
+  - DELETE (Deletepatient): baja lógica (activo=False) de la cita y sus
+    documentos relacionados.
+
+Flujo de alta por paciente:
   1. Dedup por No_Cita (doc id en la colección interface).
   2. Asegurar empresa (alias) y paquete; crearlos si no existen.
   3. Leer catálogo de estudios con mostrar_interface=true y activo=true.
@@ -23,9 +30,10 @@ from app.core.datetime_mx import fecha_hoy, hora_ahora, timestamp_iso
 from app.core.normalizer import normalize_deep
 from app.firebase import get_db
 from app.models.patient import (
-    PatientBatch,
     PatientBatchResult,
+    PatientIngestRequest,
     PatientResult,
+    SapOperation,
     SapPatient,
 )
 
@@ -55,6 +63,19 @@ def _resolve_empresa_id(db: firestore.Client, s: Settings, alias: str, nombre: s
     )
     logger.info("Empresa creada: %s — %s", alias, nombre)
     return doc.id
+
+
+def _resolve_empresa_opcional(db: firestore.Client, s: Settings, pat: SapPatient) -> str:
+    """Resuelve la empresa solo si SAP envió un cte_id no vacío.
+
+    SAP puede mandar `patCteId=""` (paciente sin empresa/particular). En ese
+    caso no creamos una empresa con alias vacío: devolvemos "".
+    """
+    alias = (pat.cte_id or "").strip()
+    if not alias:
+        logger.info("Paciente sin empresa (cte_id vacío) — No_Cita=%s", pat.no_cita)
+        return ""
+    return _resolve_empresa_id(db, s, alias, pat.desc_cte)
 
 
 def _ensure_paquete(db: firestore.Client, s: Settings, paq_id: str, nombre: str) -> None:
@@ -103,18 +124,20 @@ def _catalogo_estudios(db: firestore.Client, s: Settings) -> list[dict]:
     return estudios
 
 
-def _procesar_paciente(db: firestore.Client, s: Settings, pat: SapPatient) -> PatientResult:
-    """Procesa un único paciente. No lanza excepción: la captura y la reporta."""
+def _insertar_paciente(db: firestore.Client, s: Settings, pat: SapPatient) -> PatientResult:
+    """Alta de un único paciente. No lanza excepción: la captura y la reporta."""
     try:
         interface_ref = db.collection(s.col_interface).document(pat.no_cita)
 
         # 1. Dedup por No_Cita (doc id natural).
         if interface_ref.get().exists:
             logger.info("Cita ya existe (No_Cita=%s) — omitido", pat.no_cita)
-            return PatientResult(no_cita=pat.no_cita, status="omitido")
+            return PatientResult(
+                no_cita=pat.no_cita, status="omitido", operacion=SapOperation.INSERT.value
+            )
 
-        # 2. Empresa y paquete.
-        empresa_id = _resolve_empresa_id(db, s, pat.cte_id, pat.desc_cte)
+        # 2. Empresa (opcional) y paquete.
+        empresa_id = _resolve_empresa_opcional(db, s, pat)
         _ensure_paquete(db, s, pat.paq_id, pat.desc_paq)
 
         # 3. Catálogo de estudios.
@@ -224,6 +247,7 @@ def _procesar_paciente(db: firestore.Client, s: Settings, pat: SapPatient) -> Pa
                 "paquete_rel": pat.paq_id,
                 "desc_paquete": pat.desc_paq,
                 "estatus_evaluado": 1,
+                "activo": True,
                 "paciente_id": paciente_ref.id,
                 "seguimiento_id": seguimiento_ref.id,
                 "fecha_crea": hoy,
@@ -243,33 +267,176 @@ def _procesar_paciente(db: firestore.Client, s: Settings, pat: SapPatient) -> Pa
         return PatientResult(
             no_cita=pat.no_cita,
             status="procesado",
+            operacion=SapOperation.INSERT.value,
             paciente_id=paciente_ref.id,
             seguimiento_id=seguimiento_ref.id,
         )
 
     except Exception as exc:  # noqa: BLE001 — se reporta por paciente
-        logger.exception("Error procesando No_Cita=%s", pat.no_cita)
-        return PatientResult(no_cita=pat.no_cita, status="error", detail=str(exc))
+        logger.exception("Error insertando No_Cita=%s", pat.no_cita)
+        return PatientResult(
+            no_cita=pat.no_cita,
+            status="error",
+            operacion=SapOperation.INSERT.value,
+            detail=str(exc),
+        )
 
 
-def procesar_lote(batch: PatientBatch) -> PatientBatchResult:
-    """Procesa un lote de pacientes y devuelve el resumen."""
+def _actualizar_paciente(db: firestore.Client, s: Settings, pat: SapPatient) -> PatientResult:
+    """Actualiza una cita existente. Si no existe, hace alta (upsert)."""
+    try:
+        interface_ref = db.collection(s.col_interface).document(pat.no_cita)
+        snap = interface_ref.get()
+        if not snap.exists:
+            logger.info("Update sin cita previa (No_Cita=%s) — se da de alta", pat.no_cita)
+            return _insertar_paciente(db, s, pat)
+
+        data = snap.to_dict() or {}
+        paciente_id = data.get("paciente_id")
+        user = s.default_user_crea
+        ahora = timestamp_iso()
+
+        batch = db.batch()
+
+        # Actualiza datos del paciente vinculado (si lo hay).
+        if paciente_id:
+            paciente_ref = db.collection(s.col_pacientes).document(paciente_id)
+            batch.set(
+                paciente_ref,
+                normalize_deep({
+                    "nombre1": pat.nombre1,
+                    "nombre2": pat.nombre2,
+                    "apellido_paterno": pat.ape_pat,
+                    "apellido_materno": pat.ape_mat,
+                    "nombre_completo": pat.nombre_completo,
+                    "genero": pat.genero,
+                    "historia": pat.num_hist,
+                    "fecha_nac": pat.fecha_nac,
+                    "user_mod": user,
+                    "fecha_mod": ahora,
+                }),
+                merge=True,
+            )
+
+        # Actualiza la trazabilidad en interface.
+        batch.set(
+            interface_ref,
+            normalize_deep({
+                "fecha_cita": pat.fecha_cita,
+                "historia": pat.num_hist,
+                "historia_tmp": pat.episodio,
+                "nombre1": pat.nombre1,
+                "nombre2": pat.nombre2,
+                "ape_paterno": pat.ape_pat,
+                "ape_materno": pat.ape_mat,
+                "genero": pat.genero,
+                "fecha_nac": pat.fecha_nac,
+                "id_empresa": pat.cte_id,
+                "desc_empresa": pat.desc_cte,
+                "id_paquete": pat.paq_id,
+                "paquete_rel": pat.paq_id,
+                "desc_paquete": pat.desc_paq,
+                "user_mod": user,
+                "fecha_mod": ahora,
+            }),
+            merge=True,
+        )
+
+        batch.commit()
+        logger.info("Paciente actualizado: No_Cita=%s paciente=%s", pat.no_cita, paciente_id)
+        return PatientResult(
+            no_cita=pat.no_cita,
+            status="actualizado",
+            operacion=SapOperation.UPDATE.value,
+            paciente_id=paciente_id,
+            seguimiento_id=data.get("seguimiento_id"),
+        )
+
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Error actualizando No_Cita=%s", pat.no_cita)
+        return PatientResult(
+            no_cita=pat.no_cita,
+            status="error",
+            operacion=SapOperation.UPDATE.value,
+            detail=str(exc),
+        )
+
+
+def _eliminar_paciente(db: firestore.Client, s: Settings, pat: SapPatient) -> PatientResult:
+    """Baja lógica (activo=False) de la cita y sus documentos relacionados."""
+    try:
+        interface_ref = db.collection(s.col_interface).document(pat.no_cita)
+        snap = interface_ref.get()
+        if not snap.exists:
+            logger.info("Delete sin cita previa (No_Cita=%s) — omitido", pat.no_cita)
+            return PatientResult(
+                no_cita=pat.no_cita, status="omitido", operacion=SapOperation.DELETE.value
+            )
+
+        data = snap.to_dict() or {}
+        paciente_id = data.get("paciente_id")
+        seguimiento_id = data.get("seguimiento_id")
+        user = s.default_user_crea
+        ahora = timestamp_iso()
+        baja = {"activo": False, "user_mod": user, "fecha_mod": ahora}
+
+        batch = db.batch()
+        batch.set(interface_ref, baja, merge=True)
+        if paciente_id:
+            batch.set(db.collection(s.col_pacientes).document(paciente_id), baja, merge=True)
+        if seguimiento_id:
+            batch.set(
+                db.collection(s.col_seguimientos).document(seguimiento_id), baja, merge=True
+            )
+        batch.commit()
+
+        logger.info("Paciente eliminado (baja lógica): No_Cita=%s", pat.no_cita)
+        return PatientResult(
+            no_cita=pat.no_cita,
+            status="eliminado",
+            operacion=SapOperation.DELETE.value,
+            paciente_id=paciente_id,
+            seguimiento_id=seguimiento_id,
+        )
+
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Error eliminando No_Cita=%s", pat.no_cita)
+        return PatientResult(
+            no_cita=pat.no_cita,
+            status="error",
+            operacion=SapOperation.DELETE.value,
+            detail=str(exc),
+        )
+
+
+_DISPATCH = {
+    SapOperation.INSERT: _insertar_paciente,
+    SapOperation.UPDATE: _actualizar_paciente,
+    SapOperation.DELETE: _eliminar_paciente,
+}
+
+
+def procesar_solicitud(req: PatientIngestRequest) -> PatientBatchResult:
+    """Procesa la solicitud de SAP según la operación y devuelve el resumen."""
     s = get_settings()
     db = get_db()
-    resultado = PatientBatchResult()
+    operacion = req.operacion
+    handler = _DISPATCH[operacion]
+    resultado = PatientBatchResult(operacion=operacion.value)
 
-    for pat in batch.patients:
-        r = _procesar_paciente(db, s, pat)
+    for pat in req.lista_pacientes():
+        r = handler(db, s, pat)
         resultado.resultados.append(r)
-        if r.status == "procesado":
-            resultado.procesados += 1
+        if r.status == "error":
+            resultado.errores += 1
         elif r.status == "omitido":
             resultado.omitidos += 1
-        else:
-            resultado.errores += 1
+        else:  # procesado | actualizado | eliminado
+            resultado.procesados += 1
 
     logger.info(
-        "Lote pacientes — procesados: %d, omitidos: %d, errores: %d",
+        "Solicitud pacientes (%s) — procesados: %d, omitidos: %d, errores: %d",
+        operacion.value,
         resultado.procesados,
         resultado.omitidos,
         resultado.errores,

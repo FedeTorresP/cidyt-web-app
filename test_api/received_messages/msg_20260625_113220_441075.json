@@ -1,0 +1,25 @@
+{
+  "controller": [],
+  "message": {
+    "controller": [],
+    "type": "Import",
+    "event": "Insertpatient",
+    "messageid": "CIDYT0000211960"
+  },
+  "patient": {
+    "controller": [],
+    "patNoCita": "0000211960",
+    "patFechaCita": "2026/06/25",
+    "patEpisodio": "1000178746",
+    "patNumHist": "1000268635",
+    "patNombre1": "SASEUM",
+    "patApePat": "BECERRA",
+    "patApeMat": "",
+    "patGenero": "M",
+    "patFechaNac": "2019/08/10",
+    "patCteId": "",
+    "patDescCte": " ",
+    "patPaqId": "DT0007",
+    "patDesPaq": "CHECK UP ALEN C"
+  }
+}

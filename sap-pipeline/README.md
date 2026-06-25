@@ -66,52 +66,67 @@ docker compose up -d --build
 
 ### Pacientes — `POST /patients`
 
-Acepta los nombres originales de SAP (`PatNoCita`, ...) o los nombres limpios.
+SAP envía **un paciente por POST**, envuelto en `message` + `patient`. Este es
+el formato real que produce el método ABAP `SEND2PO2` (la primera letra de cada
+campo va en minúscula porque así serializa el XML a JSON):
 
 ```json
 {
-  "patients": [
-    {
-      "PatNoCita": "45821",
-      "PatFechaCita": "2026-06-16",
-      "PatEpisodio": "EP-0099",
-      "PatNumHist": "100234",
-      "PatNombre1": "Juan",
-      "PatNombre2": "Carlos",
-      "PatApePat": "López",
-      "PatApeMat": "García",
-      "PatGenero": "M",
-      "PatFechaNac": "1985-03-20",
-      "PatCteId": "UDC-001",
-      "PatDescCte": "Empresa Ejemplo S.A.",
-      "PatPaqId": "UDC-267-0001",
-      "PatDesPaq": "Paquete Ejecutivo"
-    }
-  ]
+  "message": { "type": "Import", "event": "Insertpatient", "messageid": "CIDYT0000211960" },
+  "patient": {
+    "patNoCita": "0000211960",
+    "patFechaCita": "2026/06/25",
+    "patEpisodio": "1000178746",
+    "patNumHist": "1000268635",
+    "patNombre1": "SASEUM",
+    "patApePat": "BECERRA",
+    "patApeMat": "",
+    "patGenero": "M",
+    "patFechaNac": "2019/08/10",
+    "patCteId": "",
+    "patDescCte": " ",
+    "patPaqId": "DT0007",
+    "patDesPaq": "CHECK UP ALEN C"
+  }
 }
 ```
+
+Compatibilidad de formatos:
+
+- **Nombres de campo:** se aceptan las tres formas — `patNoCita` (real de SAP),
+  `PatNoCita` (PascalCase del XML) y `no_cita` (interno) — vía `AliasChoices`.
+- **Operación:** se deriva de `message.event`:
+  `Insert*` → alta, `Update*` → actualización (upsert), `Delete*` → baja lógica
+  (`activo=false`). Si `event` falta o no se reconoce, se asume alta.
+- **Fechas:** `yyyy/mm/dd` (y `dd.mm.yyyy`) se normalizan a `yyyy-mm-dd`.
+- **Empresa opcional:** si `patCteId` viene vacío, no se crea empresa con alias
+  vacío; el seguimiento queda con `empresa_id=""`.
+- **Lote propio:** también se acepta `{"patients": [ ... ]}` para cargas masivas.
 
 ### Paquetes — `POST /packages`
 
+Acepta el envoltorio de SAP (`{"message": {...}, "package": {...}}`) o el lote
+propio (`{"packages": [ ... ]}`). Los nombres aceptan camelCase de SAP
+(`prestacion`), PascalCase (`Prestacion`) y el nombre interno.
+
 ```json
 {
-  "packages": [
-    {
-      "CeSanitario": "CS-01",
-      "CatPrestaciones": "CAT-A",
-      "Paquete": "UDC-267-0001",
-      "DescPaq": "Paquete Ejecutivo",
-      "Activo": true,
-      "prestaciones": [
-        { "Prestacion": "PR-001", "DescPrest": "Biometría Hemática", "Posicion": 1, "Cantidad": 1, "Validezde": "01.01.2026", "Valideza": "31.12.2026" },
-        { "Prestacion": "PR-002", "DescPrest": "Química Sanguínea",  "Posicion": 2, "Cantidad": 1, "Validezde": "01.01.2026", "Valideza": "31.12.2026" }
-      ]
-    }
-  ]
+  "message": { "type": "Import", "event": "Insertpackage", "messageid": "..." },
+  "package": {
+    "ceSanitario": "CS-01",
+    "catPrestaciones": "CAT-A",
+    "paquete": "UDC-267-0001",
+    "descPaq": "Paquete Ejecutivo",
+    "activo": true,
+    "prestaciones": [
+      { "prestacion": "PR-001", "descPrest": "Biometría Hemática", "posicion": 1, "cantidad": 1, "validezde": "01.01.2026", "valideza": "31.12.2026" },
+      { "prestacion": "PR-002", "descPrest": "Química Sanguínea",  "posicion": 2, "cantidad": 1, "validezde": "01.01.2026", "valideza": "31.12.2026" }
+    ]
+  }
 }
 ```
 
-> Las fechas `dd.mm.yyyy` se normalizan a `yyyy-mm-dd` (igual que el legacy).
+> Las fechas `dd.mm.yyyy` y `yyyy/mm/dd` se normalizan a `yyyy-mm-dd`.
 
 ## Notas de implementación
 

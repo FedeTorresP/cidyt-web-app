@@ -29,3 +29,40 @@ def hora_ahora() -> str:
 def timestamp_iso() -> str:
     """Timestamp ISO 8601 con zona horaria."""
     return now_mx().isoformat()
+
+
+def normalize_fecha(value: str | None) -> str | None:
+    """Normaliza una fecha de SAP a 'YYYY-MM-DD'.
+
+    SAP envía las fechas en varios formatos según el canal:
+      - 'yyyy/mm/dd'  (JSON actual de SEND2PO2, p. ej. '2026/06/25')
+      - 'dd.mm.yyyy'  (fechas de validez de paquetes)
+      - 'yyyy-mm-dd'  (ya normalizada)
+
+    Devuelve la fecha en ISO 'YYYY-MM-DD'. Si no reconoce el formato, devuelve
+    el valor original recortado para no perder información.
+    """
+    if not value:
+        return None
+    v = value.strip()
+    if not v:
+        return None
+
+    # dd.mm.yyyy -> yyyy-mm-dd
+    if "." in v:
+        partes = v.split(".")
+        if len(partes) == 3 and len(partes[2]) == 4:
+            d, m, y = partes
+            return f"{y}-{m.zfill(2)}-{d.zfill(2)}"
+
+    # yyyy/mm/dd o dd/mm/yyyy -> yyyy-mm-dd
+    if "/" in v:
+        partes = v.split("/")
+        if len(partes) == 3:
+            if len(partes[0]) == 4:  # yyyy/mm/dd
+                y, m, d = partes
+            else:  # dd/mm/yyyy
+                d, m, y = partes
+            return f"{y}-{m.zfill(2)}-{d.zfill(2)}"
+
+    return v  # ya viene en otro formato (p. ej. yyyy-mm-dd); se deja tal cual

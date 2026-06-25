@@ -1,0 +1,12 @@
+{
+  "message": {
+    "type": "Import",
+    "event": "Insertpatient",
+    "messageId": "CIDYT123"
+  },
+  "patient": {
+    "patNoCita": "123",
+    "patNombre1": "JUAN",
+    "patApePat": "PÉREZ"
+  }
+}

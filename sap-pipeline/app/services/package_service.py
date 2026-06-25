@@ -19,8 +19,8 @@ from app.core.datetime_mx import timestamp_iso
 from app.core.normalizer import normalize_deep
 from app.firebase import get_db
 from app.models.package import (
-    PackageBatch,
     PackageBatchResult,
+    PackageIngestRequest,
     PackageResult,
     SapPackage,
 )
@@ -118,13 +118,14 @@ def _procesar_paquete(db: firestore.Client, s: Settings, pkg: SapPackage) -> Pac
         return PackageResult(paquete=pkg.paquete, status="error", detail=str(exc))
 
 
-def procesar_lote(batch: PackageBatch) -> PackageBatchResult:
-    """Procesa un lote de paquetes y devuelve el resumen."""
+def procesar_solicitud(req: PackageIngestRequest) -> PackageBatchResult:
+    """Procesa la solicitud de paquetes de SAP y devuelve el resumen."""
     s = get_settings()
     db = get_db()
-    resultado = PackageBatchResult()
+    operacion = req.operacion
+    resultado = PackageBatchResult(operacion=operacion.value)
 
-    for pkg in batch.packages:
+    for pkg in req.lista_paquetes():
         r = _procesar_paquete(db, s, pkg)
         resultado.resultados.append(r)
         if r.status == "procesado":
@@ -133,7 +134,8 @@ def procesar_lote(batch: PackageBatch) -> PackageBatchResult:
             resultado.errores += 1
 
     logger.info(
-        "Lote paquetes — procesados: %d, errores: %d",
+        "Solicitud paquetes (%s) — procesados: %d, errores: %d",
+        operacion.value,
         resultado.procesados,
         resultado.errores,
     )
