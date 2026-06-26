@@ -22,6 +22,14 @@ export interface EstudioCellState {
   estudiosPacienteId?: string | null
 }
 
+export interface EstudioAdicionalListaDia {
+  id: string
+  nombre: string
+  estatusEstId: number
+  letraEstAdic: string | null
+  observaciones: string | null
+}
+
 export interface PacienteListaDia {
   seguimientoId: string
   turno: number
@@ -39,6 +47,7 @@ export interface PacienteListaDia {
   horaEntrega: string | null
   tarjetaEntRes: 0 | 1 | 2
   tieneAdicionales: boolean
+  estudiosAdicionales?: EstudioAdicionalListaDia[]
   estudios: Record<number, EstudioCellState>
 }
 
@@ -98,7 +107,10 @@ function buildEstudiosFromLegacy(
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const PACIENTES_MOCK: PacienteListaDia[] = [
-  { seguimientoId: '73605', turno: 1, nombre: 'ALFREDO CANO JAUREGUI SEGURA MILLAN', desayuno: 0, estatusValpac: 2, padecimientoId: 0, medicoInternista: 'NEGREROS BALVANERA FABIOLA', paqueteId: 'DT0066', paqueteNombre: 'CHECK UP EMPRESA D', edad: 41, peso: 0, talla: 0, fechaEntrega: 'Tue Dec 31', horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: true, estudios: buildEstudiosFromLegacy({ 1: 4, 2: 4, 3: 2, 4: 1, 5: 1, 6: 1, 7: 4, 8: 1, 9: 6, 19: 6, 10: 1, 11: 1, 12: 1, 13: 6, 14: 1, 15: 4, 16: 1, 17: 1, 18: 1, 20: 1 }, { 7: { letraMedico: 'H' }, 15: { letraMedico: 'V' }, 16: { letraMedico: 'L' } }) },
+  { seguimientoId: '73605', turno: 1, nombre: 'ALFREDO CANO JAUREGUI SEGURA MILLAN', desayuno: 0, estatusValpac: 2, padecimientoId: 0, medicoInternista: 'NEGREROS BALVANERA FABIOLA', paqueteId: 'DT0066', paqueteNombre: 'CHECK UP EMPRESA D', edad: 41, peso: 0, talla: 0, fechaEntrega: 'Tue Dec 31', horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: true, estudiosAdicionales: [
+    { id: 'ea-73605-1', nombre: 'VIT. B 12, VITA D', estatusEstId: 2, letraEstAdic: 'A', observaciones: null },
+    { id: 'ea-73605-2', nombre: 'HEMOGLOBINA GLICOSILADA', estatusEstId: 4, letraEstAdic: 'B', observaciones: 'Resultado normal' },
+  ], estudios: buildEstudiosFromLegacy({ 1: 4, 2: 4, 3: 2, 4: 1, 5: 1, 6: 1, 7: 4, 8: 1, 9: 6, 19: 6, 10: 1, 11: 1, 12: 1, 13: 6, 14: 1, 15: 4, 16: 1, 17: 1, 18: 1, 20: 1 }, { 7: { letraMedico: 'H' }, 15: { letraMedico: 'V' }, 16: { letraMedico: 'L' } }) },
   { seguimientoId: '73607', turno: 2, nombre: 'SIXTA GUTIERREZ RIVERA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 50, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
   { seguimientoId: '73608', turno: 3, nombre: 'ASAHI TOSHIYA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0040', paqueteNombre: 'CHECK UP EMPRESA C', edad: 45, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2, 7: 1, 8: 1, 9: 2, 19: 2, 10: 2, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
   { seguimientoId: '73609', turno: 4, nombre: 'VERONICA ADRIANA BAÑUELOS SANCHEZ', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 38, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2, 7: 1, 8: 2, 9: 1, 19: 2, 10: 1, 11: 4, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },

@@ -284,9 +284,41 @@ function ModalDatosPaciente({
         {/* Fila 6: Estudios Adicionales (100%) */}
         <div style={{ marginBottom: '20px' }}>
           <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-texto)', marginBottom: '8px' }}>Estudios Adicionales</h4>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-texto-suave)', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '12px', textAlign: 'center' }}>
-            No se encontró ningún resultado
-          </p>
+          {paciente.estudiosAdicionales && paciente.estudiosAdicionales.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {paciente.estudiosAdicionales.map((ea) => {
+                const estatus = ESTATUS_ESTUDIO.find((e) => e.id === ea.estatusEstId) ?? ESTATUS_ESTUDIO[0]
+                return (
+                  <div
+                    key={ea.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '8px 12px' }}
+                  >
+                    <span
+                      style={{ flexShrink: 0, width: '24px', height: '24px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#E65100', border: '1.5px solid #E65100', background: '#fff' }}
+                      title="Letra estudio adicional"
+                    >
+                      {ea.letraEstAdic ?? '·'}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-texto)' }}>{ea.nombre}</div>
+                      {ea.observaciones && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-texto-suave)' }}>{ea.observaciones}</div>
+                      )}
+                    </div>
+                    <span
+                      style={{ flexShrink: 0, backgroundColor: estatus.esBorde ? '#fff' : estatus.color, border: estatus.esBorde ? '1px solid #d1d5db' : 'none', color: estatus.esBorde ? 'var(--color-texto-suave)' : '#fff', borderRadius: '9999px', padding: '3px 10px', fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap' }}
+                    >
+                      {estatus.nombre}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-texto-suave)', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '12px', textAlign: 'center' }}>
+              No se encontró ningún resultado
+            </p>
+          )}
         </div>
 
         {/* Botón cerrar */}
