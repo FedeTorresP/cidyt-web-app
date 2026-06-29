@@ -39,3 +39,21 @@ export function useMedicosActivos() {
     enabled: !!user && !authLoading,
   })
 }
+
+/**
+ * Un médico es Internista cuando no tiene letra asignada o cuando el campo
+ * de letra (Nombre_Corto) contiene literalmente "INTERNISTA".
+ */
+export function esMedicoInternista(m: Pick<Medico, 'letra'>): boolean {
+  const l = m.letra?.trim().toUpperCase()
+  return !l || l === 'INTERNISTA'
+}
+
+/**
+ * Etiqueta para mostrar un médico: la letra cuando es un médico de área,
+ * o la palabra "INTERNISTA" para el segundo conjunto de médicos.
+ */
+export function formatMedicoLabel(letra: string | null, nombre: string | null): string {
+  const nom = nombre ?? 'Sin nombre'
+  return esMedicoInternista({ letra }) ? `INTERNISTA — ${nom}` : `${letra} — ${nom}`
+}

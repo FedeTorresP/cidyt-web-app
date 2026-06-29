@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getFirebaseAuth } from '@/lib/firebase'
+import { doc, setDoc } from 'firebase/firestore'
+import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase'
 import { nowMX, formatDateMX } from '@/lib/timezone'
+import { fetchTurnoOverrides, applyTurnoOverrides } from '@/lib/turno-overrides'
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TIPOS
@@ -118,7 +120,9 @@ async function fetchPacientesDelDia(fecha: string, activo: boolean): Promise<Pac
   }
   const hoy = formatDateMX(nowMX())
   if (fecha !== hoy) return []
-  return MOCK_PACIENTES.filter((p) => p.activo === activo)
+  // Sin backend: usamos datos mock pero aplicamos los turnos persistidos en Firestore
+  const overrides = await fetchTurnoOverrides()
+  return applyTurnoOverrides(MOCK_PACIENTES.filter((p) => p.activo === activo), overrides)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -228,6 +232,58 @@ export function useEditarPaciente() {
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ['registro-pacientes'] })
       qc.invalidateQueries({ queryKey: ['paciente-detalle', variables.seguimientoId] })
+    },
+  })
+}
+
+/**
+ * Cambia solo el turno de un paciente (edición inline en la tabla).
+ * Escritura primaria: PATCH /api/pacientes/:id { Turno }.
+ * Si el backend no responde, cae a Firestore `seguimientos/{id}.turno`.
+ */
+export function useSetTurno() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ seguimientoId, turno }: { seguimientoId: string; turno: number }) => {
+      // Solo intentamos la API on-prem si está configurada (evita 404 contra el dev server)
+      if (API_BASE) {
+        try {
+          const headers = await getAuthHeaders()
+          const res = await fetch(`${API_BASE}/api/pacientes/${seguimientoId}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ Turno: turno }),
+          })
+          if (res.ok) return { seguimientoId, turno }
+        } catch {
+          // fallback a Firestore
+        }
+      }
+      // Fallback Firestore: merge para crear el doc si aún no existe (datos mock)
+      const db = getFirebaseFirestore()
+      await setDoc(doc(db, 'seguimientos', seguimientoId), { turno }, { merge: true })
+      return { seguimientoId, turno }
+    },
+    onMutate: async ({ seguimientoId, turno }) => {
+      await qc.cancelQueries({ queryKey: ['registro-pacientes'] })
+      const snapshots = qc.getQueriesData<PacienteRegistro[]>({ queryKey: ['registro-pacientes'] })
+      for (const [key, data] of snapshots) {
+        if (!data) continue
+        qc.setQueryData<PacienteRegistro[]>(
+          key,
+          data.map((p) => (p.seguimientoId === seguimientoId ? { ...p, turno } : p)),
+        )
+      }
+      return { snapshots }
+    },
+    onError: (_err, _vars, context) => {
+      context?.snapshots?.forEach(([key, data]) => qc.setQueryData(key, data))
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['registro-pacientes'] })
+      qc.invalidateQueries({ queryKey: ['lista-dia-pacientes'] })
+      qc.invalidateQueries({ queryKey: ['lista-caja-pacientes'] })
     },
   })
 }

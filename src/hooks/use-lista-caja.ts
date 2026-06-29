@@ -1,10 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
-import { getFirebaseAuth } from '@/lib/firebase'
+import { collection, getDocs, query, where } from 'firebase/firestore'
+import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase'
 import { nowMX, formatDateMX } from '@/lib/timezone'
+import { fetchTurnoOverrides, applyTurnoOverrides } from '@/lib/turno-overrides'
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TIPOS
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Celda de estudio en Caja: estatus + letra del médico (solo en Completo). */
+export interface EstudioCajaCell {
+  estatusId: number
+  letraMedico: string | null
+}
 
 export interface PacienteCaja {
   seguimientoId: string
@@ -18,7 +26,7 @@ export interface PacienteCaja {
   tarjetaEntRes: 0 | 1 | 2 | null
   estatusValpac: 0 | 1 | 2
   medicoInternista: string | null
-  estudios: Record<number, number> // estudioId → estatusId
+  estudios: Record<number, EstudioCajaCell> // estudioId → celda
 }
 
 export const LISTA_CAJA_QUERY_KEY = ['lista-caja-pacientes']
@@ -27,7 +35,10 @@ export const LISTA_CAJA_QUERY_KEY = ['lista-caja-pacientes']
    DATOS MOCK
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const PACIENTES_MOCK: PacienteCaja[] = [
+/** Forma cruda devuelta por el API / mock (estudios como estatusId numérico). */
+type PacienteCajaRaw = Omit<PacienteCaja, 'estudios'> & { estudios: Record<number, number> }
+
+const PACIENTES_MOCK: PacienteCajaRaw[] = [
   { seguimientoId: '73605', turno: 1, nombre: 'ALFREDO CANO JAUREGUI SEGURA MILLAN', edad: 41, paqueteNombre: 'CHECK UP EMPRESA D', peso: 0, talla: 0, desayuno: 0, tarjetaEntRes: 0, estatusValpac: 2, medicoInternista: 'NEGREROS BALVANERA FABIOLA', estudios: { 1: 4, 2: 4, 3: 2, 4: 1, 5: 1, 6: 1, 7: 4, 8: 1, 9: 6, 19: 6, 10: 1, 11: 1, 12: 1, 13: 6, 14: 1, 15: 4, 16: 1, 17: 1, 18: 1, 20: 1 } },
   { seguimientoId: '73607', turno: 2, nombre: 'SIXTA GUTIERREZ RIVERA', edad: 50, paqueteNombre: 'CHECK UP BASICO', peso: 0, talla: 0, desayuno: 0, tarjetaEntRes: 0, estatusValpac: 0, medicoInternista: null, estudios: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
   { seguimientoId: '73608', turno: 3, nombre: 'ASAHI TOSHIYA', edad: 45, paqueteNombre: 'CHECK UP EMPRESA C', peso: 0, talla: 0, desayuno: 0, tarjetaEntRes: 0, estatusValpac: 0, medicoInternista: null, estudios: { 1: 2, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2, 7: 1, 8: 1, 9: 2, 19: 2, 10: 2, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 } },
@@ -51,7 +62,63 @@ const PACIENTES_MOCK: PacienteCaja[] = [
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
+/** Normaliza estudios crudos (número) a celdas con letra de médico vacía. */
+function normalizeCajaEstudios(raw: Record<number, number>): Record<number, EstudioCajaCell> {
+  const out: Record<number, EstudioCajaCell> = {}
+  for (const [key, estatusId] of Object.entries(raw)) {
+    out[Number(key)] = { estatusId: Number(estatusId) || 0, letraMedico: null }
+  }
+  return out
+}
+
+/** Lee estudios_paciente de Firestore para enriquecer las celdas con la letra del médico. */
+async function enrichCajaWithFirestore(pacientes: PacienteCaja[]): Promise<PacienteCaja[]> {
+  if (pacientes.length === 0) return pacientes
+  const seguimientoIds = pacientes.map((p) => p.seguimientoId)
+  const db = getFirebaseFirestore()
+
+  const bySegEstudio = new Map<string, { estatusId: number; letraMedico: string | null }>()
+  for (let i = 0; i < seguimientoIds.length; i += 30) {
+    const chunk = seguimientoIds.slice(i, i + 30)
+    const snap = await getDocs(
+      query(
+        collection(db, 'estudios_paciente'),
+        where('seguimientoId', 'in', chunk),
+        where('activo', '==', true),
+      ),
+    )
+    for (const d of snap.docs) {
+      const data = d.data()
+      const letra = typeof data.letraMedico === 'string' && data.letraMedico.trim() !== ''
+        ? data.letraMedico.trim()
+        : null
+      bySegEstudio.set(`${String(data.seguimientoId ?? '')}:${String(data.estudioId ?? '')}`, {
+        estatusId: Number(data.estatusEstudioId) || 0,
+        letraMedico: letra,
+      })
+    }
+  }
+
+  if (bySegEstudio.size === 0) return pacientes
+
+  return pacientes.map((pac) => {
+    const estudios = { ...pac.estudios }
+    let changed = false
+    for (const estudioKey of Object.keys(estudios)) {
+      const ep = bySegEstudio.get(`${pac.seguimientoId}:${estudioKey}`)
+      if (!ep) continue
+      changed = true
+      estudios[Number(estudioKey)] = {
+        estatusId: ep.estatusId || estudios[Number(estudioKey)].estatusId,
+        letraMedico: ep.letraMedico,
+      }
+    }
+    return changed ? { ...pac, estudios } : pac
+  })
+}
+
 async function fetchListaCaja(fecha: string): Promise<PacienteCaja[]> {
+  let raw: PacienteCajaRaw[] | null = null
   try {
     const user = getFirebaseAuth().currentUser
     const headers: HeadersInit = { 'Content-Type': 'application/json' }
@@ -60,13 +127,26 @@ async function fetchListaCaja(fecha: string): Promise<PacienteCaja[]> {
       headers.Authorization = `Bearer ${token}`
     }
     const res = await fetch(`${API_BASE}/api/caja?fecha=${fecha}`, { headers })
-    if (res.ok) return await res.json()
+    if (res.ok) raw = (await res.json()) as PacienteCajaRaw[]
   } catch {
     // fallback
   }
-  // Mock: solo retorna datos para hoy
-  const hoy = formatDateMX(nowMX())
-  return fecha === hoy ? PACIENTES_MOCK : []
+  if (raw == null) {
+    const hoy = formatDateMX(nowMX())
+    // Sin backend: usar mock con los turnos persistidos en Registro de Pacientes
+    raw = fecha === hoy ? applyTurnoOverrides(PACIENTES_MOCK, await fetchTurnoOverrides()) : []
+  }
+
+  const pacientes: PacienteCaja[] = raw.map((p) => ({
+    ...p,
+    estudios: normalizeCajaEstudios(p.estudios),
+  }))
+
+  try {
+    return await enrichCajaWithFirestore(pacientes)
+  } catch {
+    return pacientes
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

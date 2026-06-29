@@ -177,6 +177,12 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // Estudios externos (pacientes sin cita) — alta y consulta por usuarios autenticados
+    match /estudios_externos/{docId} {
+      allow read, create, update: if isAuth();
+      allow delete: if isSuperAdmin();
+    }
+
     match /val_corporal/{docId} {
       allow read, create, update: if isAuth();
       allow delete: if isSuperAdmin();

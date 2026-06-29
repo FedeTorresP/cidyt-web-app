@@ -7,6 +7,7 @@ import {
   fetchReporteCaja,
   fetchReporteEstadistica,
   fetchReporteCheckup,
+  fetchReporteConsultasEspecialista,
   type RangoUtc,
 } from '@/hooks/use-reportes'
 import { useCubiculos } from '@/hooks/use-cubiculos'
@@ -17,6 +18,7 @@ import {
   exportReporteCaja,
   exportReporteEstadistica,
   exportReporteCheckup,
+  exportReporteConsultasEspecialista,
 } from '@/lib/excel-export'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -45,7 +47,7 @@ function buildRango(fechaInicio: string, fechaFin: string): RangoUtc {
 
 // ─── Tipos de descarga ───────────────────────────────────────────────────────
 
-type ReporteKey = 'general' | 'caja' | 'estadistica' | 'checkup'
+type ReporteKey = 'general' | 'caja' | 'estadistica' | 'checkup' | 'consultas'
 
 // ─── Componente principal ────────────────────────────────────────────────────
 
@@ -60,6 +62,8 @@ function ReportesPage() {
   const [fechaCajaFin, setFechaCajaFin] = useState(today)
   const [fechaEstInicio, setFechaEstInicio] = useState(firstOfMonth)
   const [fechaEstFin, setFechaEstFin] = useState(today)
+  const [fechaConsInicio, setFechaConsInicio] = useState(firstOfMonth)
+  const [fechaConsFin, setFechaConsFin] = useState(today)
 
   // Cubículos
   const [cubiculoId, setCubiculoId] = useState('')
@@ -121,6 +125,25 @@ function ReportesPage() {
       const cubNombre = cubiculos.find((c) => c.id === cubiculoId)?.nombre ?? cubiculoId
       await exportReporteEstadistica(data, cubNombre, fechaEstInicio, fechaEstFin)
       toast.success('Reporte de Estadística descargado correctamente.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido'
+      toast.error('Error al generar el reporte.', { description: msg })
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  async function handleDescargarConsultas() {
+    if (fechaConsFin < fechaConsInicio) {
+      toast.warning('La fecha fin no puede ser menor que la fecha inicio.')
+      return
+    }
+    setDownloading('consultas')
+    try {
+      const rango = buildRango(fechaConsInicio, fechaConsFin)
+      const data = await fetchReporteConsultasEspecialista(rango)
+      await exportReporteConsultasEspecialista(data, fechaConsInicio, fechaConsFin)
+      toast.success('Reporte de Consultas por Especialista descargado correctamente.')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error desconocido'
       toast.error('Error al generar el reporte.', { description: msg })
@@ -385,6 +408,71 @@ function ReportesPage() {
               disabled={downloading === 'checkup'}
             >
               {downloading === 'checkup' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar Excel
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* ────────────────────────────────────────────────────────────────
+         * Card 5 — Consultas por Especialista
+         * ──────────────────────────────────────────────────────────────── */}
+        <Card className="border-green-200">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-bold">Consultas por Especialista</CardTitle>
+              <span className="bg-blue-50 text-blue-600 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                Por rango
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              N&uacute;mero de consultas (estudios completados) que brind&oacute; cada especialista
+              en el per&iacute;odo.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="cons-inicio" className="text-xs font-medium text-muted-foreground">
+                  Fecha inicio
+                </label>
+                <Input
+                  id="cons-inicio"
+                  type="date"
+                  value={fechaConsInicio}
+                  onChange={(e) => {
+                    setFechaConsInicio(e.target.value)
+                    if (fechaConsFin < e.target.value) setFechaConsFin(e.target.value)
+                  }}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="cons-fin" className="text-xs font-medium text-muted-foreground">
+                  Fecha fin
+                </label>
+                <Input
+                  id="cons-fin"
+                  type="date"
+                  value={fechaConsFin}
+                  min={fechaConsInicio}
+                  onChange={(e) => setFechaConsFin(e.target.value)}
+                />
+              </div>
+            </div>
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
+              onClick={handleDescargarConsultas}
+              disabled={downloading === 'consultas'}
+            >
+              {downloading === 'consultas' ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Generando...

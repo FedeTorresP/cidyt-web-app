@@ -141,7 +141,9 @@ async function fetchReporteGeneral(rango: RangoUtc): Promise<FilaGeneral[]> {
         if (epData.estudioId) {
           const estDoc = await getDoc(doc(db, 'estudios', epData.estudioId))
           if (estDoc.exists()) {
-            estudioNames.push((estDoc.data()?.nombre as string) ?? '')
+            // Usar nombre corto (abreviatura) cuando exista
+            const ed = estDoc.data()
+            estudioNames.push((ed?.abreviatura as string) ?? (ed?.nombre as string) ?? '')
           }
         }
       }
@@ -211,7 +213,9 @@ async function fetchReporteEstadistica(rango: RangoUtc): Promise<FilaEstadistica
 
     const estDoc = await getDoc(doc(db, 'estudios', estudioId))
     if (estDoc.exists()) {
-      estudioNombre = (estDoc.data()?.nombre as string) ?? estudioId
+      // Usar nombre corto (abreviatura) cuando exista
+      const ed = estDoc.data()
+      estudioNombre = (ed?.abreviatura as string) ?? (ed?.nombre as string) ?? estudioId
     }
 
     if (estudioTipoId) {
@@ -284,6 +288,69 @@ async function fetchReporteCaja(rango: RangoUtc): Promise<FilaCaja[]> {
   )
 }
 
+// ─── Reporte: Consultas por especialista ─────────────────────────────────────
+
+export interface FilaConsultasEspecialista {
+  letra: string
+  medicoNombre: string | null
+  total: number
+}
+
+/**
+ * Cuenta los estudios COMPLETADOS (estatus 4) agrupados por la letra del médico,
+ * dentro del rango de fechas (unión estudios_paciente → seguimientos).
+ */
+async function fetchReporteConsultasEspecialista(
+  rango: RangoUtc,
+): Promise<FilaConsultasEspecialista[]> {
+  const db = getFirebaseFirestore()
+
+  const segSnap = await getDocs(
+    query(
+      collection(db, 'seguimientos'),
+      where('activo', '==', true),
+      where('fechaIngresoUtc', '>=', Timestamp.fromDate(rango.startUtc)),
+      where('fechaIngresoUtc', '<=', Timestamp.fromDate(rango.endUtc)),
+    ),
+  )
+  const seguimientoIds = segSnap.docs.map((d) => d.id)
+  if (seguimientoIds.length === 0) return []
+
+  // Mapa letra → nombre del médico
+  const medSnap = await getDocs(collection(db, 'medicos'))
+  const letraToNombre = new Map<string, string>()
+  for (const m of medSnap.docs) {
+    const data = m.data()
+    const letra = typeof data.letra === 'string' ? data.letra.trim() : ''
+    if (letra) letraToNombre.set(letra, (data.nombreCompleto as string) ?? '')
+  }
+
+  const countByLetra = new Map<string, number>()
+  for (let i = 0; i < seguimientoIds.length; i += 30) {
+    const batch = seguimientoIds.slice(i, i + 30)
+    const epSnap = await getDocs(
+      query(
+        collection(db, 'estudios_paciente'),
+        where('seguimientoId', 'in', batch),
+        where('activo', '==', true),
+      ),
+    )
+    for (const d of epSnap.docs) {
+      const data = d.data()
+      if (Number(data.estatusEstudioId) !== 4) continue
+      const letra = typeof data.letraMedico === 'string' ? data.letraMedico.trim() : ''
+      if (!letra) continue
+      countByLetra.set(letra, (countByLetra.get(letra) ?? 0) + 1)
+    }
+  }
+
+  const results: FilaConsultasEspecialista[] = [...countByLetra.entries()].map(
+    ([letra, total]) => ({ letra, medicoNombre: letraToNombre.get(letra) ?? null, total }),
+  )
+  results.sort((a, b) => b.total - a.total)
+  return results
+}
+
 // ─── Hooks ───────────────────────────────────────────────────────────────────
 
 export function useReporteCheckup(rango: RangoUtc | null) {
@@ -318,6 +385,20 @@ export function useReporteCaja(rango: RangoUtc | null) {
   })
 }
 
+export function useReporteConsultasEspecialista(rango: RangoUtc | null) {
+  return useQuery({
+    queryKey: ['reporte-consultas-especialista', rango?.startUtc.toISOString(), rango?.endUtc.toISOString()],
+    queryFn: () => fetchReporteConsultasEspecialista(rango!),
+    enabled: !!rango,
+  })
+}
+
 // ─── Funciones de fetch directas (para uso imperativo en la página) ──────────
 
-export { fetchReporteCheckup, fetchReporteGeneral, fetchReporteEstadistica, fetchReporteCaja }
+export {
+  fetchReporteCheckup,
+  fetchReporteGeneral,
+  fetchReporteEstadistica,
+  fetchReporteCaja,
+  fetchReporteConsultasEspecialista,
+}

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { useAuth } from '@/hooks/use-auth'
-import { useMedicosActivos } from '@/hooks/use-medicos'
+import { useMedicosActivos, formatMedicoLabel, esMedicoInternista } from '@/hooks/use-medicos'
 import { useLugaresActivos } from '@/hooks/use-lugares'
 import { useHorariosActivos } from '@/hooks/use-horarios'
 import { useMedicosPorLugarEstudioMap } from '@/hooks/use-medico-lugar-estudio'
@@ -29,7 +29,7 @@ function MedicoDiaPage() {
   const [formMedicoId, setFormMedicoId] = useState('')
   const [formLugarId, setFormLugarId] = useState('')
   const [formFecha, setFormFecha] = useState(todayMX)
-  const [formHorarioId, setFormHorarioId] = useState('')
+  const [formHorarioIds, setFormHorarioIds] = useState<string[]>([])
 
   // ── Estado de la tabla ─────────────────────────────────────────────────────
   const [tablaFecha, setTablaFecha] = useState(todayMX)
@@ -41,21 +41,44 @@ function MedicoDiaPage() {
   const { data: horarios, isLoading: loadingHorarios, isError: errorHorarios, error: horariosError } = useHorariosActivos()
   const { map: medicosPorLugar } = useMedicosPorLugarEstudioMap()
 
+  // En Lugares solo se asignan médicos de área (con letra); los internistas se excluyen
+  const medicosAsignables = useMemo(
+    () => (medicos ?? []).filter((m) => !esMedicoInternista(m)),
+    [medicos],
+  )
+
+  // Lugar seleccionado → limita médicos
   const medicosFiltrados = useMemo(() => {
-    if (!medicos) return []
-    if (!formLugarId) return medicos
+    if (!formLugarId) return medicosAsignables
     const ids = medicosPorLugar.get(formLugarId) ?? []
     if (ids.length === 0) return []
     const idSet = new Set(ids)
-    return medicos.filter((m) => idSet.has(m.id))
-  }, [medicos, formLugarId, medicosPorLugar])
+    return medicosAsignables.filter((m) => idSet.has(m.id))
+  }, [medicosAsignables, formLugarId, medicosPorLugar])
 
+  // Médico seleccionado → limita lugares (filtrado bidireccional)
+  const lugaresFiltrados = useMemo(() => {
+    if (!lugares) return []
+    if (!formMedicoId) return lugares
+    const allowed = new Set<string>()
+    medicosPorLugar.forEach((medicoIds, lugarId) => {
+      if (medicoIds.includes(formMedicoId)) allowed.add(lugarId)
+    })
+    return lugares.filter((l) => allowed.has(l.id))
+  }, [lugares, formMedicoId, medicosPorLugar])
+
+  // Si la combinación deja de ser válida, limpiar el campo afectado
   useEffect(() => {
-    if (!formMedicoId || !formLugarId) return
-    if (!medicosFiltrados.some((m) => m.id === formMedicoId)) {
+    if (formMedicoId && formLugarId && !medicosFiltrados.some((m) => m.id === formMedicoId)) {
       setFormMedicoId('')
     }
   }, [formLugarId, medicosFiltrados, formMedicoId])
+
+  useEffect(() => {
+    if (formMedicoId && formLugarId && !lugaresFiltrados.some((l) => l.id === formLugarId)) {
+      setFormLugarId('')
+    }
+  }, [formMedicoId, lugaresFiltrados, formLugarId])
 
   // ── Asignaciones del día ───────────────────────────────────────────────────
   const {
@@ -85,7 +108,13 @@ function MedicoDiaPage() {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function toggleHorario(horarioId: string) {
+    setFormHorarioIds((prev) =>
+      prev.includes(horarioId) ? prev.filter((id) => id !== horarioId) : [...prev, horarioId],
+    )
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
     if (!formMedicoId) {
@@ -100,36 +129,42 @@ function MedicoDiaPage() {
       toast.error('Seleccione una fecha.')
       return
     }
-    if (!formHorarioId) {
-      toast.error('Seleccione un horario.')
+    if (formHorarioIds.length === 0) {
+      toast.error('Seleccione al menos un horario.')
       return
     }
 
-    crearMutation.mutate(
-      {
-        medicoId: formMedicoId,
-        lugarEstudioId: formLugarId,
-        horarioId: formHorarioId,
-        fecha: formFecha,
-        creadoPor: user?.email ?? user?.uid ?? 'unknown',
-      },
-      {
-        onSuccess: () => {
-          toast.success('Asignación registrada correctamente.')
-          setFormMedicoId('')
-          setFormLugarId('')
-          setFormHorarioId('')
-          // Si la fecha del formulario coincide con la tabla, refrescar
-          if (formFecha === queryFecha) {
-            refetchAsignaciones()
-          }
-        },
-        onError: (err) => {
-          const msg = err instanceof Error ? err.message : 'Error al crear la asignación.'
-          toast.error(msg)
-        },
-      },
+    // Una asignación por cada horario marcado
+    const resultados = await Promise.allSettled(
+      formHorarioIds.map((horarioId) =>
+        crearMutation.mutateAsync({
+          medicoId: formMedicoId,
+          lugarEstudioId: formLugarId,
+          horarioId,
+          fecha: formFecha,
+          creadoPor: user?.email ?? user?.uid ?? 'unknown',
+        }),
+      ),
     )
+
+    const fallidos = resultados.filter((r) => r.status === 'rejected')
+    if (fallidos.length === 0) {
+      toast.success('Asignación registrada correctamente.')
+    } else if (fallidos.length < resultados.length) {
+      toast.warning('Algunas asignaciones no se pudieron registrar.')
+    } else {
+      const err = (fallidos[0] as PromiseRejectedResult).reason
+      toast.error(err instanceof Error ? err.message : 'Error al crear la asignación.')
+    }
+
+    if (fallidos.length < resultados.length) {
+      setFormMedicoId('')
+      setFormLugarId('')
+      setFormHorarioIds([])
+      if (formFecha === queryFecha) {
+        refetchAsignaciones()
+      }
+    }
   }
 
   function handleActualizar() {
@@ -192,7 +227,7 @@ function MedicoDiaPage() {
                     <option value="">— Seleccione médico —</option>
                     {medicosFiltrados.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.letra ? `${m.letra} — ${m.nombreCompleto ?? `Médico #${m.id}`}` : (m.nombreCompleto ?? `Médico #${m.id}`)}
+                        {formatMedicoLabel(m.letra, m.nombreCompleto ?? `Médico #${m.id}`)}
                       </option>
                     ))}
                   </select>
@@ -215,7 +250,7 @@ function MedicoDiaPage() {
                     className="h-11 w-full rounded-md border border-[var(--color-borde)] bg-white px-3 text-sm text-[var(--color-texto)] outline-none focus:ring-2 focus:ring-[var(--color-primario)]"
                   >
                     <option value="">— Seleccione lugar —</option>
-                    {lugares?.map((l) => (
+                    {lugaresFiltrados.map((l) => (
                       <option key={l.id} value={l.id}>
                         {l.nombre}
                       </option>
@@ -242,29 +277,27 @@ function MedicoDiaPage() {
                   />
                 </div>
 
-                {/* Horario */}
+                {/* Horario — dos casillas (turnos) */}
                 <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="form-horario"
-                    className="text-sm font-medium text-[var(--color-texto-suave)]"
-                  >
+                  <span className="text-sm font-medium text-[var(--color-texto-suave)]">
                     Horario <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    id="form-horario"
-                    value={formHorarioId}
-                    onChange={(e) => setFormHorarioId(e.target.value)}
-                    required
-                    aria-required="true"
-                    className="h-11 w-full rounded-md border border-[var(--color-borde)] bg-white px-3 text-sm text-[var(--color-texto)] outline-none focus:ring-2 focus:ring-[var(--color-primario)]"
-                  >
-                    <option value="">— Seleccione horario —</option>
+                  </span>
+                  <div className="flex items-center gap-4 h-11">
                     {horarios?.map((h) => (
-                      <option key={h.id} value={h.id}>
+                      <label
+                        key={h.id}
+                        className="inline-flex items-center gap-2 text-sm text-[var(--color-texto)] cursor-pointer select-none"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formHorarioIds.includes(h.id)}
+                          onChange={() => toggleHorario(h.id)}
+                          className="w-5 h-5 cursor-pointer accent-[var(--color-primario)]"
+                        />
                         {h.nombre}
-                      </option>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
               </div>
 
@@ -356,13 +389,16 @@ function MedicoDiaPage() {
                       }
                     >
                       <td className="px-3 py-2 border-b border-[var(--color-borde)] whitespace-nowrap">
-                        {asig.medicoLetra ? (
+                        {esMedicoInternista({ letra: asig.medicoLetra }) ? (
+                          <>
+                            <span className="font-bold text-[var(--color-texto-suave)] mr-1">INTERNISTA</span>
+                            {asig.medicoNombre}
+                          </>
+                        ) : (
                           <>
                             <span className="font-bold text-[var(--color-primario)] mr-1">{asig.medicoLetra}</span>
                             {asig.medicoNombre}
                           </>
-                        ) : (
-                          asig.medicoNombre
                         )}
                       </td>
                       <td className="px-3 py-2 border-b border-[var(--color-borde)] whitespace-nowrap">

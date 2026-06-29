@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase'
 import { nowMX, formatDateMX } from '@/lib/timezone'
+import { fetchTurnoOverrides, applyTurnoOverrides } from '@/lib/turno-overrides'
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TIPOS
@@ -62,7 +63,7 @@ export interface UpdateEstudioPacienteInput {
 
 export const LISTA_DIA_QUERY_KEY = ['lista-dia-pacientes']
 
-const ESTATUS_CON_LETRA = new Set([3, 4]) // En Proceso, Completo — conservar letra
+const ESTATUS_CON_LETRA = new Set([4]) // Completo — conservar letra del médico
 
 /* ═══════════════════════════════════════════════════════════════════════════
    HELPERS — normalización estudios
@@ -239,7 +240,10 @@ async function fetchListaDiaRaw(fecha: string): Promise<PacienteListaDia[]> {
     // fallback
   }
   const hoy = formatDateMX(nowMX())
-  return fecha === hoy ? PACIENTES_MOCK : []
+  if (fecha !== hoy) return []
+  // Sin backend: reflejar los turnos cambiados en Registro de Pacientes
+  const overrides = await fetchTurnoOverrides()
+  return applyTurnoOverrides(PACIENTES_MOCK, overrides)
 }
 
 async function fetchListaDia(fecha: string): Promise<PacienteListaDia[]> {

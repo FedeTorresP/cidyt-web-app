@@ -117,46 +117,51 @@ function CubiculoCard({ item }: { item: CubiculoItem }) {
 
   return (
     <div className={`bg-[#1e293b] rounded-md border-l-[5px] p-2.5 flex flex-col justify-between overflow-hidden hover:bg-[#263548] transition-colors duration-150 h-[190px] ${borderClass}`}>
-      
-      {/* Header Card */}
-      <div className="flex items-center justify-between gap-1.5 shrink-0">
-        <span className="text-[1.1rem] font-bold text-[#f1f5f9] flex-1 leading-tight">
+
+      {/* Header Card — Consultorio (protagonista) + dot de estatus */}
+      <div className="flex items-start justify-between gap-1.5 shrink-0">
+        <span className="text-[1.45rem] font-extrabold text-[#f8fafc] flex-1 leading-tight">
           {nombre}
         </span>
         {!isInactive && (
-          <span className={`w-[11px] h-[11px] rounded-full shrink-0 ${dotBgClass}`} />
+          <span className={`w-[13px] h-[13px] rounded-full shrink-0 mt-1 ${dotBgClass}`} />
         )}
       </div>
 
-      {/* Timer / Centro */}
-      <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
+      {/* Centro — Médico (protagonista) */}
+      <div className="flex-1 flex flex-col items-start justify-center min-h-0 overflow-hidden w-full">
+        {showMedico && medicoLabel ? (
+          <div className="flex items-center gap-2 w-full overflow-hidden" aria-label={medicoLabel}>
+            {medicoLetra ? (
+              <span className="inline-flex items-center justify-center shrink-0 w-9 h-9 rounded-md bg-[#0ea5e9] text-white text-[1.3rem] font-extrabold tabular-nums">
+                {medicoLetra}
+              </span>
+            ) : null}
+            {medicoNombre ? (
+              <span className="text-[1.6rem] font-extrabold text-white leading-tight truncate">
+                {medicoNombre}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <span className="text-[1.1rem] font-semibold text-slate-500">
+            {isInactive ? 'Inactivo' : 'Disponible'}
+          </span>
+        )}
+      </div>
+
+      {/* Footer Card — Timer (secundario, discreto) */}
+      <div className="min-h-[1.4rem] flex items-center justify-end shrink-0 w-full overflow-hidden">
         {showTimer && minTranscurridos != null && (
           <div className="flex items-baseline leading-none">
-            <span className={`font-mono text-[4.5rem] font-extrabold tabular-nums tracking-tighter ${timerColorClass}`}>
+            <span className={`font-mono text-[1.5rem] font-bold tabular-nums tracking-tight ${timerColorClass}`}>
               {minTranscurridos}
             </span>
-            <span className={`font-mono text-[1.2rem] font-semibold ml-[3px] ${unitColorClass}`}>
+            <span className={`font-mono text-[0.8rem] font-semibold ml-[2px] ${unitColorClass}`}>
               min
             </span>
           </div>
         )}
-      </div>
-
-      {/* Footer Card — letra (Firestore medicos) + apellido (API/mock) */}
-      <div className="min-h-[1.4rem] flex items-center shrink-0 w-full overflow-hidden">
-        {showMedico && medicoLabel ? (
-          <span
-            className="text-[1.35rem] font-bold text-white truncate flex items-baseline gap-2 w-full"
-            aria-label={medicoLabel}
-          >
-            {medicoLetra ? (
-              <span className="text-[#38bdf8] shrink-0 tabular-nums">{medicoLetra}</span>
-            ) : null}
-            {medicoNombre ? (
-              <span className="truncate">{medicoNombre}</span>
-            ) : null}
-          </span>
-        ) : null}
       </div>
     </div>
   )

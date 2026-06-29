@@ -87,6 +87,19 @@ textarea {
   width: 100%;
 }
 
+/* Las casillas/radios no deben heredar el estilo de input de texto (evita
+   que se rendericen enormes en iPad). Se restauran a su apariencia nativa. */
+input[type="checkbox"],
+input[type="radio"] {
+  -webkit-appearance: auto;
+  appearance: auto;
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+
 input[type="date"],
 input[type="time"],
 input[type="datetime-local"] {

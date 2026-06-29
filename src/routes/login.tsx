@@ -73,7 +73,7 @@ function LoginPage() {
 
   // Si ya está autenticado y pasó por el flujo, redirigir
   if (user && step === 'credentials') {
-    navigate({ to: '/' })
+    navigate({ to: '/paciente' })
     return null
   }
 
@@ -114,7 +114,7 @@ function LoginPage() {
     if (!selectedTurno) return
     setLoading(true)
     sessionStorage.setItem('cidyt_turno', selectedTurno)
-    navigate({ to: '/' })
+    navigate({ to: '/paciente' })
   }
 
   /* ─────────────────────────────────────────────────────────────────────────

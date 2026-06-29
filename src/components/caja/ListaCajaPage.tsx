@@ -55,7 +55,9 @@ const TARJETA_MAP: Record<number, { label: string; color: string }> = {
 export function ListaCajaPage() {
   const hoy = formatDateMX(nowMX())
   const [fecha, setFecha] = useState(() => hoy)
-  const { data: pacientes = [], refetch } = useListaCaja(fecha)
+  const { data: pacientesRaw = [], refetch } = useListaCaja(fecha)
+  // Orden automático por turno ascendente
+  const pacientes = [...pacientesRaw].sort((a, b) => a.turno - b.turno)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const [toolbarHeight, setToolbarHeight] = useState(0)
 
@@ -214,7 +216,8 @@ export function ListaCajaPage() {
                 const completo = pac.estatusValpac === 2
                 const listoParaSalir = pac.estatusValpac === 1
                 const rowBgBase = idx % 2 === 0 ? 'var(--color-fondo)' : 'var(--color-fondo-card)'
-                const turnoBg = completo ? 'rgba(0, 130, 180, 0.30)' : rowBgBase
+                // Café (marrón) moderno cuando el paciente terminó su visita
+                const turnoBg = completo ? 'rgba(120, 64, 28, 0.36)' : rowBgBase
                 const nombreBg = (completo || listoParaSalir)
                   ? 'rgba(0, 166, 81, 0.28)'
                   : rowBgBase
@@ -281,8 +284,11 @@ export function ListaCajaPage() {
                       )}
                     </td>
                     {ESTUDIOS_COLUMNAS.map((est) => {
-                      const estatusId = pac.estudios[est.id] ?? 0
+                      const cell = pac.estudios[est.id]
+                      const estatusId = cell?.estatusId ?? 0
                       const estatus = ESTATUS_ESTUDIO.find((e) => e.id === estatusId) ?? ESTATUS_ESTUDIO[0]
+                      // Solo se muestra la letra del médico (asignada al Completar el estudio)
+                      const cellText = cell?.letraMedico ?? ''
                       return (
                         <td
                           key={est.id}
@@ -297,12 +303,12 @@ export function ListaCajaPage() {
                               backgroundColor: estatus.esBorde ? 'transparent' : estatus.color,
                               border: estatus.esBorde ? '1.5px solid #d1d5db' : 'none',
                               borderRadius: '4px',
-                              color: estatus.esBorde ? 'transparent' : '#ffffff',
+                              color: '#ffffff',
                             }}
-                            title={`${est.nombre}: ${estatus.nombre}`}
+                            title={`${est.nombre}: ${estatus.nombre}${cellText ? ` (${cellText})` : ''}`}
                             aria-label={`${est.nombre}: ${estatus.nombre}`}
                           >
-                            {estatus.letra}
+                            {cellText}
                           </span>
                         </td>
                       )

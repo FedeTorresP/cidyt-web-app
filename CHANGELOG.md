@@ -5,7 +5,40 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
-## [3.7.0] — 2026-06-25
+## [3.8.0] — 2026-06-29
+
+### Requerimientos de usuario final — turnos, internistas, externos y reportería
+
+Lote amplio de mejoras solicitadas por el usuario final tras sesión en sitio: gestión de turnos en vivo, manejo correcto de médicos internistas, registro funcional de estudios externos, nueva reportería y múltiples pulidos de UI/UX.
+
+#### Agregado
+- **Turno editable en vivo**: edición inline en la tabla de `/paciente` y en el formulario de edición; la lista se reordena automáticamente por turno ascendente
+- **Tarjeta de confirmación de turno duplicado** (`TurnoConflictDialog`): al asignar un turno ya en uso muestra `El turno N está asignado a: NOMBRE` con acciones **Continuar** / **Cancelar**
+- **Propagación de turno a toda la app**: helper compartido `src/lib/turno-overrides.ts` (`fetchTurnoOverrides` / `applyTurnoOverrides`); un cambio de turno se refleja en Lista del Día y Caja
+- **`useSetTurno`** en `use-registro-pacientes.ts`: PATCH `/api/pacientes/:id` con fallback a Firestore (`seguimientos/{id}.turno`) y actualización optimista
+- **Estudios Externos funcionales**: registro persistido en Firestore (colección `estudios_externos`) con selección de **área** (Lab, Imagen, etc.) y vista de listado del día
+- **Reporte "Consultas por Especialista"**: cuántas consultas dio cada especialista, con hook `useReporteConsultasEspecialista` y exportación a Excel
+- **Médicos internistas en Detalle de Paciente**: segundo conjunto de médicos (campo letra = `INTERNISTA`) disponible en el dropdown "Médico Internista"
+
+#### Modificado
+- **Letra del médico solo en "Completo"**: la letra aparece en la celda del estudio únicamente cuando el estatus es Completo (antes también en "En Proceso")
+- **Landing page** → `/paciente` (Registro de Pacientes) tras iniciar sesión
+- **Lista de Cubículos**: jerarquía visual con consultorio y médico como elementos principales; el cronómetro pasa a posición secundaria
+- **Modal "Obs"**: muestra los estudios adicionales como solo lectura (sin control de estatus)
+- **Detección de internistas** (`use-medicos.ts`): `esMedicoInternista` reconoce letra vacía **o** el texto literal `INTERNISTA`; `formatMedicoLabel` reutiliza la lógica
+- **Lugares**: dropdown "Horario" reemplazado por dos casillas (dos horarios), filtrado bidireccional Lugar ⇄ Médico, alta de múltiples horarios; los internistas se excluyen del dropdown "Médico" pero se muestran como `INTERNISTA` en la tabla de asignaciones
+- **Estudios del Paquete**: la columna Médico se llena con el médico seleccionado al completar; para estudios fuera de área (Lab/CT) se listan todos los médicos con letra; persistencia en Firestore (`estudios_paciente`)
+- **Caja**: celda de turno en café más intenso para "Paciente terminó su visita"; las celdas de estudio muestran la letra del médico
+- **Reportería**: uso del nombre corto (`abreviatura`) de los estudios en los reportes
+- **Unicidad de letra** en estudios adicionales: una letra ya asignada a un paciente no puede reutilizarse para otro
+- **`globals.css`**: reset de `input[type=checkbox]/radio` para que las casillas se rendericen correctamente en iPad
+
+#### Eliminado
+- **Ruta duplicada `estudios-externos.lazy.tsx`**: consolidada en `/externos` (la antigua ruta ahora redirige)
+
+---
+
+## [3.7.0] — 2026-06-25 [`65df3ce`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/65df3ce)
 
 ### Integración SAP — Cloud Function relay hacia sap-pipeline On-Premise
 

@@ -1,9 +1,10 @@
 import { createLazyFileRoute, useRouter } from '@tanstack/react-router'
 import { useState, useCallback, useEffect, useMemo } from 'react'
+import { collection, addDoc, updateDoc, doc, getDocs, query, where } from 'firebase/firestore'
 import { Button } from '@/components/ui/button'
-import { getFirebaseAuth } from '@/lib/firebase'
-import { useUpdatePacienteCache } from '@/hooks/use-lista-dia'
-import { useMedicosActivos } from '@/hooks/use-medicos'
+import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase'
+import { useUpdatePacienteCache, useListaDia } from '@/hooks/use-lista-dia'
+import { useMedicosActivos, esMedicoInternista } from '@/hooks/use-medicos'
 import { useEstudiosActivos } from '@/hooks/use-estudios'
 import { useMedicosPorLugarEstudioMap } from '@/hooks/use-medico-lugar-estudio'
 import { getMedicosPorLugar } from '@/lib/medico-resolver'
@@ -67,7 +68,83 @@ interface Catalogos {
   padecimientos: Padecimiento[]
 }
 
-const LUGAR_INTERNISTA_ID = '10'
+/** Celda de estudio del paquete respaldada por Firestore `estudios_paciente`. */
+interface EpCell {
+  docId: string | null
+  estatusId: number
+  medicoId: string | null
+  letraMedico: string | null
+  observaciones: string
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIRESTORE — estudios_paciente (tabla del paquete)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+async function loadEstudiosPaciente(seguimientoId: string): Promise<Record<number, EpCell>> {
+  const db = getFirebaseFirestore()
+  const snap = await getDocs(
+    query(
+      collection(db, 'estudios_paciente'),
+      where('seguimientoId', '==', seguimientoId),
+      where('activo', '==', true),
+    ),
+  )
+  const out: Record<number, EpCell> = {}
+  for (const d of snap.docs) {
+    const data = d.data()
+    const eid = Number(data.estudioId)
+    if (!Number.isFinite(eid)) continue
+    out[eid] = {
+      docId: d.id,
+      estatusId: Number(data.estatusEstudioId) || 0,
+      medicoId: data.medicoId != null ? String(data.medicoId) : null,
+      letraMedico:
+        typeof data.letraMedico === 'string' && data.letraMedico.trim() !== ''
+          ? data.letraMedico.trim()
+          : null,
+      observaciones: typeof data.observaciones === 'string' ? data.observaciones : '',
+    }
+  }
+  return out
+}
+
+/** Escribe parcialmente una celda; crea el doc si no existe. Devuelve el docId. */
+async function persistEpField(
+  seguimientoId: string,
+  estudioId: number,
+  current: EpCell | undefined,
+  patch: Partial<{ medicoId: string | null; letraMedico: string | null; observaciones: string }>,
+): Promise<string> {
+  const db = getFirebaseFirestore()
+  if (current?.docId) {
+    await updateDoc(doc(db, 'estudios_paciente', current.docId), patch)
+    return current.docId
+  }
+  const snap = await getDocs(
+    query(
+      collection(db, 'estudios_paciente'),
+      where('seguimientoId', '==', seguimientoId),
+      where('estudioId', '==', String(estudioId)),
+      where('activo', '==', true),
+    ),
+  )
+  if (!snap.empty) {
+    await updateDoc(doc(db, 'estudios_paciente', snap.docs[0].id), patch)
+    return snap.docs[0].id
+  }
+  const ref = await addDoc(collection(db, 'estudios_paciente'), {
+    seguimientoId,
+    estudioId: String(estudioId),
+    estatusEstudioId: String(current?.estatusId ?? 0),
+    medicoId: null,
+    letraMedico: null,
+    observaciones: '',
+    activo: true,
+    ...patch,
+  })
+  return ref.id
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    HELPERS
@@ -226,6 +303,7 @@ function SeguimientoPacientePage() {
   const router = useRouter()
   const updateListaDiaCache = useUpdatePacienteCache()
   const fechaHoy = formatDateMX(nowMX())
+  const { data: pacientesDia = [] } = useListaDia(fechaHoy)
 
   const { data: medicosFirestore = [] } = useMedicosActivos()
   const { data: estudiosCatalog = [] } = useEstudiosActivos()
@@ -241,23 +319,38 @@ function SeguimientoPacientePage() {
     [medicosPorLugar, medicosFirestore],
   )
 
+  // Médicos Internistas = segundo conjunto (letra vacía o "INTERNISTA")
   const medicosInternistas = useMemo((): MedicoInternista[] => {
-    return getMedicosPorLugar(LUGAR_INTERNISTA_ID, medicoResolverCtx).map((m) => ({
-      Medico_id: m.id,
-      Nombre_Completo: m.nombreCompleto ?? `Médico #${m.id}`,
-      Letra: m.letra,
-    }))
-  }, [medicoResolverCtx])
+    return medicosFirestore
+      .filter((m) => esMedicoInternista(m))
+      .map((m) => ({
+        Medico_id: m.id,
+        Nombre_Completo: m.nombreCompleto ?? `Médico #${m.id}`,
+        Letra: m.letra,
+      }))
+  }, [medicosFirestore])
+
+  // Médicos de área con letra real (para estudios fuera del área, p. ej. Lab/CT)
+  const medicosConLetra = useMemo((): MedicoEsp[] => {
+    return medicosFirestore
+      .filter((m) => !esMedicoInternista(m))
+      .map((m) => ({
+        Medico_id: m.id,
+        Nombre_Completo: m.nombreCompleto ?? `Médico #${m.id}`,
+        Letra: m.letra,
+      }))
+  }, [medicosFirestore])
 
   const getMedicosForEstudioCol = useCallback((estudioColId: number): MedicoEsp[] => {
     const estudio = estudiosCatalog.find((e) => e.id === String(estudioColId))
-    if (!estudio?.lugarEstudioId) return []
+    // Estudio fuera del área CIDyT: lo interpreta cualquier médico con letra
+    if (!estudio?.lugarEstudioId) return medicosConLetra
     return getMedicosPorLugar(estudio.lugarEstudioId, medicoResolverCtx).map((m) => ({
       Medico_id: m.id,
       Nombre_Completo: m.nombreCompleto ?? `Médico #${m.id}`,
       Letra: m.letra,
     }))
-  }, [estudiosCatalog, medicoResolverCtx])
+  }, [estudiosCatalog, medicoResolverCtx, medicosConLetra])
 
   function formatMedicoOption(m: { Medico_id: string; Nombre_Completo: string; Letra: string | null }): string {
     return m.Letra ? `${m.Letra} — ${m.Nombre_Completo}` : m.Nombre_Completo
@@ -284,12 +377,24 @@ function SeguimientoPacientePage() {
   const [horaEnvio, setHoraEnvio] = useState<string>('')
   const [observaciones, setObservaciones] = useState('')
 
-  // Estudios state
+  // Estudios state (legacy — solo se usa para estudios adicionales)
   const [estudios, setEstudios] = useState<EstudioRealizar[]>([])
+
+  // Estudios del paquete (Firestore estudios_paciente)
+  const [epMap, setEpMap] = useState<Record<number, EpCell>>({})
 
   // Estudios adicionales form
   const [nuevaLetra, setNuevaLetra] = useState('A')
   const [nuevoNombre, setNuevoNombre] = useState('')
+
+  // Cargar estudios del paquete desde Firestore
+  useEffect(() => {
+    let cancel = false
+    loadEstudiosPaciente(seguimientoId)
+      .then((map) => { if (!cancel) setEpMap(map) })
+      .catch(() => { /* sin datos en Firestore */ })
+    return () => { cancel = true }
+  }, [seguimientoId])
 
   // Cargar datos
   useEffect(() => {
@@ -370,23 +475,70 @@ function SeguimientoPacientePage() {
     setSaving(false)
   }, [seguimientoId, desayuno, padecimientoId, medicoId, estatusValpac, fechaEntrega, horaEntrega, entregados, enviar, fechaEnvio, horaEnvio, observaciones, peso, talla, router])
 
-  // Guardar estudio individual (médico + observaciones)
-  const handleEstudioSave = useCallback(async (estudioRealizarId: number, medId: string | null, obs: string) => {
-    try {
-      const headers = await authHeaders()
-      await fetch(`${API_BASE}/api/estudios/${estudioRealizarId}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ Observaciones: obs, Medico_id: medId }),
-      })
-    } catch {
-      // silently fail for now
-    }
+  // Asignar médico al estudio del paquete (Firestore estudios_paciente)
+  const handleMedicoEstudioChange = useCallback((estudioColId: number, medicoId: string | null) => {
+    const opciones = getMedicosForEstudioCol(estudioColId)
+    const letra = medicoId ? (opciones.find((m) => m.Medico_id === medicoId)?.Letra ?? null) : null
+    setEpMap((prev) => {
+      const current = prev[estudioColId]
+      return {
+        ...prev,
+        [estudioColId]: {
+          docId: current?.docId ?? null,
+          estatusId: current?.estatusId ?? 0,
+          observaciones: current?.observaciones ?? '',
+          medicoId,
+          letraMedico: letra,
+        },
+      }
+    })
+    persistEpField(seguimientoId, estudioColId, epMap[estudioColId], { medicoId, letraMedico: letra })
+      .then((docId) => setEpMap((prev) => ({ ...prev, [estudioColId]: { ...prev[estudioColId], docId } })))
+      .catch(() => showToast('Error al asignar médico', 'error'))
+  }, [seguimientoId, epMap, getMedicosForEstudioCol])
+
+  // Editar observaciones locales del estudio del paquete
+  const handleObsEstudioLocal = useCallback((estudioColId: number, value: string) => {
+    setEpMap((prev) => {
+      const current = prev[estudioColId]
+      return {
+        ...prev,
+        [estudioColId]: {
+          docId: current?.docId ?? null,
+          estatusId: current?.estatusId ?? 0,
+          medicoId: current?.medicoId ?? null,
+          letraMedico: current?.letraMedico ?? null,
+          observaciones: value,
+        },
+      }
+    })
   }, [])
+
+  // Guardar observaciones del estudio del paquete (onBlur)
+  const handleObsEstudioSave = useCallback((estudioColId: number) => {
+    const current = epMap[estudioColId]
+    persistEpField(seguimientoId, estudioColId, current, { observaciones: current?.observaciones ?? '' })
+      .then((docId) => setEpMap((prev) => ({ ...prev, [estudioColId]: { ...prev[estudioColId], docId } })))
+      .catch(() => showToast('Error al guardar observaciones', 'error'))
+  }, [seguimientoId, epMap])
 
   // Agregar estudio adicional
   const handleAgregarAdicional = useCallback(async () => {
     if (!nuevoNombre.trim()) return
+
+    // La letra de un estudio adicional no puede repetirse entre pacientes el mismo día
+    const letrasUsadas = new Set<string>()
+    for (const p of pacientesDia) {
+      if (p.seguimientoId === seguimientoId) continue
+      for (const ea of p.estudiosAdicionales ?? []) {
+        if (ea.letraEstAdic) letrasUsadas.add(ea.letraEstAdic.trim().toUpperCase())
+      }
+    }
+    if (letrasUsadas.has(nuevaLetra.trim().toUpperCase())) {
+      showToast(`La letra ${nuevaLetra} ya está asignada a otro paciente hoy.`, 'error')
+      return
+    }
+
     try {
       const headers = await authHeaders()
       const res = await fetch(`${API_BASE}/api/seguimiento/${seguimientoId}/estudios-adicionales`, {
@@ -416,7 +568,7 @@ function SeguimientoPacientePage() {
       setNuevoNombre('')
       showToast('Estudio adicional agregado (local)', 'success')
     }
-  }, [seguimientoId, nuevaLetra, nuevoNombre])
+  }, [seguimientoId, nuevaLetra, nuevoNombre, pacientesDia])
 
   // Eliminar estudio adicional
   const handleEliminarAdicional = useCallback(async (estudioRealizarId: number) => {
@@ -433,13 +585,7 @@ function SeguimientoPacientePage() {
     setEstudios((prev) => prev.filter((e) => e.Estudio_Realizar_id !== estudioRealizarId))
   }, [seguimientoId])
 
-  // Update estudio local state
-  const updateEstudioLocal = useCallback((id: number, field: 'Medico_id' | 'Observaciones', value: string | null) => {
-    setEstudios((prev) => prev.map((e) => e.Estudio_Realizar_id === id ? { ...e, [field]: value } : e))
-  }, [])
-
-  // Derivados
-  const estudiosRegulares = estudios.filter((e) => e.Estudio_id !== 100)
+  // Derivados — los adicionales siguen viniendo del API legacy
   const estudiosAdicionales = estudios.filter((e) => e.Estudio_id === 100)
 
   if (loading) {
@@ -718,7 +864,7 @@ function SeguimientoPacientePage() {
             </thead>
             <tbody>
               {ESTUDIOS_PAQUETE.map((estCol, idx) => {
-                const estData = estudiosRegulares.find((e) => e.Estudio_id === estCol.id)
+                const cell = epMap[estCol.id]
                 const medicosDisponibles = getMedicosForEstudioCol(estCol.id)
 
                 return (
@@ -729,14 +875,8 @@ function SeguimientoPacientePage() {
                     <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--color-borde)' }}>
                       <select
                         style={{ ...selectStyle, fontSize: '0.75rem' }}
-                        value={estData?.Medico_id ?? ''}
-                        onChange={(e) => {
-                          const val = e.target.value || null
-                          if (estData) {
-                            updateEstudioLocal(estData.Estudio_Realizar_id, 'Medico_id', val)
-                            handleEstudioSave(estData.Estudio_Realizar_id, val, estData.Observaciones)
-                          }
-                        }}
+                        value={cell?.medicoId ?? ''}
+                        onChange={(e) => handleMedicoEstudioChange(estCol.id, e.target.value || null)}
                         disabled={medicosDisponibles.length === 0}
                       >
                         <option value="">—</option>
@@ -749,14 +889,10 @@ function SeguimientoPacientePage() {
                       <input
                         type="text"
                         style={{ ...inputStyle, fontSize: '0.75rem' }}
-                        value={estData?.Observaciones ?? ''}
+                        value={cell?.observaciones ?? ''}
                         placeholder=""
-                        onChange={(e) => {
-                          if (estData) updateEstudioLocal(estData.Estudio_Realizar_id, 'Observaciones', e.target.value)
-                        }}
-                        onBlur={() => {
-                          if (estData) handleEstudioSave(estData.Estudio_Realizar_id, estData.Medico_id, estData.Observaciones)
-                        }}
+                        onChange={(e) => handleObsEstudioLocal(estCol.id, e.target.value)}
+                        onBlur={() => handleObsEstudioSave(estCol.id)}
                       />
                     </td>
                   </tr>

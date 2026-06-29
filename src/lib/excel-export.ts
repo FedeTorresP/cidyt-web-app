@@ -4,7 +4,12 @@
  */
 
 import ExcelJS from 'exceljs'
-import type { FilaGeneral, FilaCheckup, FilaEstadistica } from '@/hooks/use-reportes'
+import type {
+  FilaGeneral,
+  FilaCheckup,
+  FilaEstadistica,
+  FilaConsultasEspecialista,
+} from '@/hooks/use-reportes'
 
 // ─── Tipos para Reporte de Caja (placeholder) ────────────────────────────────
 
@@ -172,6 +177,40 @@ export async function exportReporteEstadistica(
   await downloadWorkbook(
     workbook,
     `reporte-estadistica-${cubiculoNombre}-${fechaInicio}-${fechaFin}.xlsx`,
+  )
+}
+
+/**
+ * Consultas por Especialista — columnas: Médico (Letra), Médico, Total Consultas
+ */
+export async function exportReporteConsultasEspecialista(
+  data: FilaConsultasEspecialista[],
+  fechaInicio: string,
+  fechaFin: string,
+) {
+  const workbook = new ExcelJS.Workbook()
+  workbook.creator = 'CIDyT'
+  workbook.created = new Date()
+
+  const ws = workbook.addWorksheet('Consultas por Especialista')
+
+  ws.mergeCells('A1:C1')
+  const titleCell = ws.getCell('A1')
+  titleCell.value = `Consultas por especialista | ${fechaInicio} a ${fechaFin}`
+  titleCell.font = { bold: true, size: 12 }
+  ws.addRow([])
+
+  const headerRow = ws.addRow(['Letra', 'Médico', 'Total Consultas'])
+  applyHeaderStyle(headerRow)
+
+  for (const fila of data) {
+    ws.addRow([fila.letra, fila.medicoNombre ?? '—', fila.total])
+  }
+
+  autoWidth(ws)
+  await downloadWorkbook(
+    workbook,
+    `reporte-consultas-especialista-${fechaInicio}-${fechaFin}.xlsx`,
   )
 }
 

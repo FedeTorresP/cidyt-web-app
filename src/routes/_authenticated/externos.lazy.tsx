@@ -1,11 +1,19 @@
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { useRegistrarEstudioExterno } from '@/hooks/use-estudios-externos'
+import {
+  useRegistrarEstudioExterno,
+  useEstudiosExternos,
+  AREAS_EXTERNAS,
+} from '@/hooks/use-estudios-externos'
 import { nowMX, formatDateMX } from '@/lib/timezone'
 
 export const Route = createLazyFileRoute('/_authenticated/externos')({
   component: EstudiosExternosPage,
 })
+
+function areaNombre(id: string): string {
+  return AREAS_EXTERNAS.find((a) => a.id === id)?.nombre ?? id
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ESTILOS
@@ -39,8 +47,12 @@ function EstudiosExternosPage() {
   // Form state
   const [fecha, setFecha] = useState(() => formatDateMX(nowMX()))
   const [nombrePaciente, setNombrePaciente] = useState('')
+  const [area, setArea] = useState<string>(AREAS_EXTERNAS[0].id)
   const [nombreEstudio, setNombreEstudio] = useState('')
   const [observaciones, setObservaciones] = useState('')
+
+  // Listado del día seleccionado
+  const { data: registros = [] } = useEstudiosExternos(fecha)
 
   // Feedback
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -77,11 +89,16 @@ function EstudiosExternosPage() {
       setErrorMsg('El nombre del estudio es obligatorio.')
       return
     }
+    if (!area) {
+      setErrorMsg('El área es obligatoria.')
+      return
+    }
 
     try {
       await registrar.mutateAsync({
         fecha,
         nombre_paciente: nombrePaciente.trim(),
+        area,
         nombre_estudio: nombreEstudio.trim(),
         observaciones: observaciones.trim() || undefined,
       })
@@ -162,6 +179,20 @@ function EstudiosExternosPage() {
             />
           </div>
 
+          {/* Área */}
+          <div>
+            <label style={labelStyle}>Área</label>
+            <select
+              style={inputStyle}
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+            >
+              {AREAS_EXTERNAS.map((a) => (
+                <option key={a.id} value={a.id}>{a.nombre}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Nombre Estudio */}
           <div>
             <label style={labelStyle}>Nombre del Estudio</label>
@@ -237,6 +268,50 @@ function EstudiosExternosPage() {
             }}
           >
             {successMsg}
+          </div>
+        )}
+      </div>
+
+      {/* Listado del día */}
+      <div
+        style={{
+          background: '#ffffff',
+          borderRadius: '6px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          padding: '1.25rem',
+          marginTop: '1rem',
+        }}
+      >
+        <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#1a3a5c', marginBottom: '0.75rem' }}>
+          Estudios Externos del {fecha} ({registros.length})
+        </h2>
+
+        {registros.length === 0 ? (
+          <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+            No hay estudios externos registrados para esta fecha.
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#1a3a5c' }}>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', color: '#fff', fontWeight: 600 }}>Paciente</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', color: '#fff', fontWeight: 600 }}>Área</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', color: '#fff', fontWeight: 600 }}>Estudio</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', color: '#fff', fontWeight: 600 }}>Observaciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {registros.map((r, idx) => (
+                  <tr key={r.id} style={{ backgroundColor: idx % 2 === 0 ? '#f9fafb' : '#ffffff' }}>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #e5e7eb', fontWeight: 500, color: '#1f2937' }}>{r.nombrePaciente}</td>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #e5e7eb', color: '#374151' }}>{areaNombre(r.area)}</td>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #e5e7eb', color: '#374151' }}>{r.nombreEstudio}</td>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #e5e7eb', color: '#6b7280' }}>{r.observaciones || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

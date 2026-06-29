@@ -84,7 +84,7 @@ const LEYENDA = [
   { nombre: 'Estudios Adicionales', color: '#E65100' },
 ] as const
 
-const ESTATUS_EN_PROCESO = 3
+const ESTATUS_COMPLETO = 4
 
 interface MedicoPickerState {
   seguimientoId: string
@@ -99,7 +99,6 @@ function getEstudioCellText(cell: EstudioCellState | undefined): string {
 
 function getEstudioCellTextColor(estatusId: number, hasLetra: boolean): string {
   if (!hasLetra) return 'transparent'
-  if (estatusId === ESTATUS_EN_PROCESO) return '#1a1a1a'
   if (estatusId === 0 || estatusId === 1) return 'transparent'
   return '#ffffff'
 }
@@ -286,33 +285,25 @@ function ModalDatosPaciente({
           <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-texto)', marginBottom: '8px' }}>Estudios Adicionales</h4>
           {paciente.estudiosAdicionales && paciente.estudiosAdicionales.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {paciente.estudiosAdicionales.map((ea) => {
-                const estatus = ESTATUS_ESTUDIO.find((e) => e.id === ea.estatusEstId) ?? ESTATUS_ESTUDIO[0]
-                return (
-                  <div
-                    key={ea.id}
-                    style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '8px 12px' }}
+              {paciente.estudiosAdicionales.map((ea) => (
+                <div
+                  key={ea.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '8px 12px' }}
+                >
+                  <span
+                    style={{ flexShrink: 0, width: '24px', height: '24px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#E65100', border: '1.5px solid #E65100', background: '#fff' }}
+                    title="Letra estudio adicional"
                   >
-                    <span
-                      style={{ flexShrink: 0, width: '24px', height: '24px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#E65100', border: '1.5px solid #E65100', background: '#fff' }}
-                      title="Letra estudio adicional"
-                    >
-                      {ea.letraEstAdic ?? '·'}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-texto)' }}>{ea.nombre}</div>
-                      {ea.observaciones && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--color-texto-suave)' }}>{ea.observaciones}</div>
-                      )}
-                    </div>
-                    <span
-                      style={{ flexShrink: 0, backgroundColor: estatus.esBorde ? '#fff' : estatus.color, border: estatus.esBorde ? '1px solid #d1d5db' : 'none', color: estatus.esBorde ? 'var(--color-texto-suave)' : '#fff', borderRadius: '9999px', padding: '3px 10px', fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap' }}
-                    >
-                      {estatus.nombre}
-                    </span>
+                    {ea.letraEstAdic ?? '·'}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-texto)' }}>{ea.nombre}</div>
+                    {ea.observaciones && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-texto-suave)' }}>{ea.observaciones}</div>
+                    )}
                   </div>
-                )
-              })}
+                </div>
+              ))}
             </div>
           ) : (
             <p style={{ fontSize: '0.85rem', color: 'var(--color-texto-suave)', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '12px', textAlign: 'center' }}>
@@ -337,7 +328,9 @@ function ModalDatosPaciente({
 function ListaDiaPage() {
   const hoy = formatDateMX(nowMX())
   const [fecha, setFecha] = useState(() => hoy)
-  const { data: pacientes = [], refetch } = useListaDia(fecha)
+  const { data: pacientesRaw = [], refetch } = useListaDia(fecha)
+  // Orden automático por turno ascendente
+  const pacientes = [...pacientesRaw].sort((a, b) => a.turno - b.turno)
   const updateCache = useUpdatePacienteCache()
   const updateEstudio = useUpdateEstudioPaciente(fecha)
   const { getMedicosForEstudio, isAsignable } = useMedicosDisponiblesPorEstudio(fecha)
@@ -417,16 +410,16 @@ function ListaDiaPage() {
       return
     }
 
-    if (newEstatusId === ESTATUS_EN_PROCESO) {
+    if (newEstatusId === ESTATUS_COMPLETO) {
       const medicos = getMedicosForEstudio(estudioId)
       if (medicos.length === 0) {
         toast.warning('No hay médicos registrados presentes para esta área hoy.')
-        persistEstudio(seguimientoId, estudioId, ESTATUS_EN_PROCESO, null, null, prevCell?.estudiosPacienteId)
+        persistEstudio(seguimientoId, estudioId, ESTATUS_COMPLETO, null, null, prevCell?.estudiosPacienteId)
       } else if (medicos.length === 1) {
         persistEstudio(
           seguimientoId,
           estudioId,
-          ESTATUS_EN_PROCESO,
+          ESTATUS_COMPLETO,
           medicos[0].id,
           medicos[0].letra,
           prevCell?.estudiosPacienteId,
@@ -455,7 +448,7 @@ function ListaDiaPage() {
     persistEstudio(
       medicoPicker.seguimientoId,
       medicoPicker.estudioId,
-      ESTATUS_EN_PROCESO,
+      ESTATUS_COMPLETO,
       medico.id,
       medico.letra,
       prevCell?.estudiosPacienteId,

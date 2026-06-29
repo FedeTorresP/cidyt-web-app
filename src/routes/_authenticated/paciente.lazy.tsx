@@ -7,6 +7,7 @@ import {
   usePacienteDetalle,
   useEditarPaciente,
   useToggleActivo,
+  useSetTurno,
 } from '@/hooks/use-registro-pacientes'
 import type { PacienteFormData, PacienteRegistro } from '@/hooks/use-registro-pacientes'
 
@@ -32,6 +33,70 @@ const EMPTY_FORM: PacienteFormData = {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   ALERTA — Turno duplicado
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+interface TurnoConflict {
+  kind: 'inline' | 'form'
+  turno: number
+  conflictName: string
+  seguimientoId?: string
+}
+
+function TurnoConflictDialog({
+  state,
+  onConfirm,
+  onCancel,
+}: {
+  state: TurnoConflict | null
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  if (!state) return null
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-[var(--color-fondo-card)] rounded-xl shadow-xl w-[90vw] max-w-[420px]"
+        style={{ padding: '24px' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-texto)', marginBottom: '8px' }}>
+          Turno en uso
+        </h2>
+        <p style={{ fontSize: '0.9rem', color: 'var(--color-texto)', marginBottom: '20px', lineHeight: 1.5 }}>
+          El turno <strong>{state.turno}</strong> está asignado a: <strong>{state.conflictName}</strong>.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <button
+            onClick={onCancel}
+            style={{
+              minHeight: '40px', padding: '0 18px', fontWeight: 600, fontSize: '0.875rem',
+              color: 'var(--color-texto)', backgroundColor: 'transparent',
+              border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', cursor: 'pointer',
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              minHeight: '40px', padding: '0 18px', fontWeight: 600, fontSize: '0.875rem',
+              color: '#ffffff', backgroundColor: 'var(--color-primario)',
+              border: 'none', borderRadius: 'var(--radius-default)', cursor: 'pointer',
+            }}
+          >
+            Continuar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -45,6 +110,7 @@ function RegistroPacientesPage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [form, setForm] = useState<PacienteFormData>(EMPTY_FORM)
+  const [turnoConflict, setTurnoConflict] = useState<TurnoConflict | null>(null)
 
   // Queries
   const { data: activos = [], refetch: refetchActivos } = usePacientesDelDia(fecha, true)
@@ -55,10 +121,12 @@ function RegistroPacientesPage() {
   // Mutations
   const editarMut = useEditarPaciente()
   const toggleMut = useToggleActivo()
+  const setTurnoMut = useSetTurno()
 
   const paquetes = catalogos?.paquetes ?? []
   const empresas = catalogos?.empresas ?? []
-  const pacientes = tabActivo ? activos : cancelados
+  // Orden automático por turno ascendente (re-ordena al cambiar el turno)
+  const pacientes = [...(tabActivo ? activos : cancelados)].sort((a, b) => a.turno - b.turno)
 
   // Cargar detalle cuando se edita
   useEffect(() => {
@@ -149,6 +217,57 @@ function RegistroPacientesPage() {
   const updateField = useCallback((field: keyof PacienteFormData, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }))
   }, [])
+
+  // Busca otro paciente activo con el mismo turno
+  const findTurnoConflict = useCallback((turno: number, excludeId: string | null) => {
+    return activos.find((p) => p.seguimientoId !== excludeId && p.turno === turno) ?? null
+  }, [activos])
+
+  const persistTurno = useCallback((seguimientoId: string, turno: number) => {
+    setTurnoMut.mutate(
+      { seguimientoId, turno },
+      { onError: () => setErrorMsg('Error al cambiar el turno.') },
+    )
+  }, [setTurnoMut])
+
+  // Cambio inline (tabla): valida turno duplicado antes de guardar
+  const handleTurnoChange = useCallback((seguimientoId: string, turno: number) => {
+    const conflicto = findTurnoConflict(turno, seguimientoId)
+    if (conflicto) {
+      setTurnoConflict({ kind: 'inline', turno, conflictName: conflicto.nombre, seguimientoId })
+      return
+    }
+    persistTurno(seguimientoId, turno)
+  }, [findTurnoConflict, persistTurno])
+
+  // Cambio en el formulario de edición: valida turno duplicado antes de aplicar
+  const handleFormTurnoChange = useCallback((value: string) => {
+    const turno = Number(value)
+    const conflicto = findTurnoConflict(turno, editandoId)
+    if (conflicto) {
+      setTurnoConflict({ kind: 'form', turno, conflictName: conflicto.nombre })
+      return
+    }
+    updateField('turno', value)
+  }, [findTurnoConflict, editandoId, updateField])
+
+  const handleTurnoConfirm = useCallback(() => {
+    if (!turnoConflict) return
+    if (turnoConflict.kind === 'inline' && turnoConflict.seguimientoId) {
+      persistTurno(turnoConflict.seguimientoId, turnoConflict.turno)
+    } else if (turnoConflict.kind === 'form') {
+      updateField('turno', String(turnoConflict.turno))
+    }
+    setTurnoConflict(null)
+  }, [turnoConflict, persistTurno, updateField])
+
+  const turnoDialog = (
+    <TurnoConflictDialog
+      state={turnoConflict}
+      onConfirm={handleTurnoConfirm}
+      onCancel={() => setTurnoConflict(null)}
+    />
+  )
 
   /* ═══════════════════════════════════════════════════════════════════════
      RENDER — VISTA LISTA
@@ -275,14 +394,33 @@ function RegistroPacientesPage() {
                   pacientes.map((pac, idx) => (
                     <tr key={pac.seguimientoId} style={{ backgroundColor: idx % 2 === 0 ? 'var(--color-fondo)' : 'var(--color-fondo-card)' }}>
                       <td style={{ padding: '14px 16px', textAlign: 'center', borderBottom: '1px solid var(--color-borde)' }}>
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                          width: '18px', height: '18px', borderRadius: '50%',
-                          backgroundColor: 'rgba(10,31,92,0.08)', color: 'var(--color-primario)',
-                          fontWeight: 700, fontSize: '0.7rem',
-                        }}>
-                          {pac.turno}
-                        </span>
+                        {tabActivo ? (
+                          <select
+                            value={pac.turno}
+                            onChange={(e) => handleTurnoChange(pac.seguimientoId, Number(e.target.value))}
+                            aria-label={`Turno de ${pac.nombre}`}
+                            title="Cambiar turno"
+                            style={{
+                              minHeight: '32px', padding: '0 6px', borderRadius: '6px',
+                              border: '1px solid var(--color-borde)', backgroundColor: '#ffffff',
+                              color: 'var(--color-primario)', fontWeight: 700, fontSize: '0.8rem',
+                              cursor: 'pointer', textAlign: 'center',
+                            }}
+                          >
+                            {Array.from({ length: 99 }, (_, i) => i + 1).map((n) => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            width: '18px', height: '18px', borderRadius: '50%',
+                            backgroundColor: 'rgba(10,31,92,0.08)', color: 'var(--color-primario)',
+                            fontWeight: 700, fontSize: '0.7rem',
+                          }}>
+                            {pac.turno}
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--color-borde)', fontSize: '0.85rem', fontWeight: 500, color: 'var(--color-texto)' }}>
                         {pac.nombre}
@@ -380,6 +518,7 @@ function RegistroPacientesPage() {
             </div>
           </div>
         </div>
+        {turnoDialog}
       </div>
     )
   }
@@ -578,7 +717,7 @@ function RegistroPacientesPage() {
               <select
                 required
                 value={form.turno}
-                onChange={(e) => updateField('turno', e.target.value)}
+                onChange={(e) => handleFormTurnoChange(e.target.value)}
                 style={{ width: '100%', minHeight: '38px', padding: '0 12px', border: '1px solid var(--color-borde)', borderRadius: 'var(--radius-default)', fontSize: '1rem', backgroundColor: '#ffffff' }}
               >
                 <option value="">-- Seleccionar --</option>
@@ -611,6 +750,7 @@ function RegistroPacientesPage() {
           </button>
         </form>
       </div>
+      {turnoDialog}
     </div>
   )
 }
