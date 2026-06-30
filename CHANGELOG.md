@@ -5,6 +5,30 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.8.1] — 2026-06-30
+
+### Alpha — flujo de pacientes 100% sobre Firestore (sin SAP)
+
+Versión alpha solicitada antes de contar con las llaves de la VPC. La app deja de depender de SAP (`functions/` / `sap-pipeline`) y de la API REST on-premise (`VITE_API_URL`): los datos del paciente y su paquete se capturan manualmente y todo el flujo (Registro → Lista del Día → Caja → Detalle) lee y escribe únicamente en Firestore. La integración SAP/VPC queda intacta y lista para el beta.
+
+#### Agregado
+- **Alta manual de pacientes**: botón "+ Nuevo Paciente" y formulario de creación en `paciente.lazy.tsx`, con `useCrearPaciente` que escribe `pacientes` + `seguimientos` y siembra `estudios_paciente` a partir de `paquete_detalle` del paquete elegido (escritura atómica con batch)
+- **Capa de acceso a datos compartida** `src/lib/pacientes-firestore.ts`: `fetchSeguimientosDelDia` (consulta por rango de día MX con joins a `pacientes`, `paquetes`, `medicos`, `val_corporal`), `fetchEstudiosPacienteForSeguimientos`, `crearPacienteFirestore` y helpers (`ESTUDIO_COL_IDS`, `buildPacienteNombre`, `calcEdad`)
+- **Helper `dayRangeMX(fecha)`** en `src/lib/timezone.ts`: rango `[inicio, fin)` en UTC para un día calendario de Mexico_City (reutiliza el índice `seguimientos(activo, fechaIngresoUtc)`)
+- **Modelos**: `Paciente.historia`, campos operacionales en `Seguimiento` (`paqueteId`, `turno`, `desayuno`, `estatusValpac`, `padecimientoId`, `medicoInternistaId`, fechas/horas de entrega/envío, `tarjetaEntRes`) e interfaz `ValCorporal`
+- **Índices Firestore**: `val_corporal(seguimientoId, activo)` y `paquete_detalle(paqueteId, activo)`
+
+#### Modificado
+- **`use-registro-pacientes.ts`**: lista, detalle, edición, toggle activo/cancelado y turno operan sobre Firestore; catálogos de paquetes/empresas leídos de Firestore (sin mocks ni REST)
+- **`use-lista-dia.ts`** y **`use-lista-caja.ts`**: construyen las filas desde Firestore inicializando las 20 columnas fijas y superponiendo `estudios_paciente`; Lista del Día expone adicionales (`estudioId '100'`)
+- **`paciente_.$seguimientoId.lazy.tsx`**: carga seguimiento/paciente/paquete/`val_corporal`/padecimientos desde Firestore; guarda en `seguimientos` + `val_corporal`; estudios adicionales persistidos como `estudios_paciente` (borrado lógico). Corrige carga de `horaEnvio`
+
+#### Eliminado
+- **Mocks operacionales y fallback `VITE_API_URL`** en los hooks de Registro, Lista del Día y Caja
+- **`src/lib/turno-overrides.ts`**: el turno ahora persiste directo en `seguimientos/{id}.turno`
+
+---
+
 ## [3.8.0] — 2026-06-29
 
 ### Requerimientos de usuario final — turnos, internistas, externos y reportería

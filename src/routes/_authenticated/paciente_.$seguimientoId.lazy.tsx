@@ -1,8 +1,19 @@
 import { createLazyFileRoute, useRouter } from '@tanstack/react-router'
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { collection, addDoc, updateDoc, doc, getDocs, query, where } from 'firebase/firestore'
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  serverTimestamp,
+} from 'firebase/firestore'
 import { Button } from '@/components/ui/button'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase'
+import { buildPacienteNombre, calcEdad, ESTUDIO_ADICIONAL_ID } from '@/lib/pacientes-firestore'
 import { useUpdatePacienteCache, useListaDia } from '@/hooks/use-lista-dia'
 import { useMedicosActivos, esMedicoInternista } from '@/hooks/use-medicos'
 import { useEstudiosActivos } from '@/hooks/use-estudios'
@@ -150,15 +161,6 @@ async function persistEpField(
    HELPERS
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
-
-async function authHeaders(): Promise<HeadersInit> {
-  const user = getFirebaseAuth().currentUser
-  if (!user) return { 'Content-Type': 'application/json' }
-  const token = await user.getIdToken()
-  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
-}
-
 /** Fechas inválidas de BD → null */
 function cleanDate(val: string | null): string {
   if (!val || val === '0000-00-00' || val.startsWith('0000')) return ''
@@ -170,42 +172,68 @@ function cleanTime(val: string | null): string {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DATOS HARDCODEADOS (para desarrollo sin backend)
+   FIRESTORE — carga del seguimiento (sin SAP / sin REST)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const MOCK_CATALOGOS: Catalogos = {
-  padecimientos: [
-    { id: 1, nombre: 'Diabetes' },
-    { id: 2, nombre: 'Hipertensión' },
-    { id: 3, nombre: 'Asma' },
-  ],
+interface AdicionalItem {
+  docId: string
+  nombre: string
+  letra: string | null
 }
 
-function getMockSeguimiento(id: string): SeguimientoData {
-  return {
-    Seguimiento_id: Number(id),
-    Nombre_Completo: 'ALFREDO CANO JAUREGUI SEGURA MILLAN',
-    Edad: 41,
-    Nombre_Paquete: 'CHECK UP CIDYT D',
-    Desayuno: 0,
-    Padecimiento_id: 0,
-    Medico_id: '1',
-    Estatus_Valpac_id: 0,
-    Fecha_Ent_Resultados: '2025-12-31',
-    Hora_Ent_Resultados: '10:30:00',
-    Fecha_Envio_Resultados: null,
-    Hora_Envio_Resultados: null,
-    Observaciones: '',
-    estudios: [
-      { Estudio_Realizar_id: 1001, Estudio_id: 1, Nombre: 'Laboratorios', Estatus_Est_id: 4, Observaciones: '', Medico_id: null, Letra_Est_Adic: null, Activo: 1 },
-      { Estudio_Realizar_id: 1002, Estudio_id: 2, Nombre: 'Torax', Estatus_Est_id: 4, Observaciones: '', Medico_id: null, Letra_Est_Adic: null, Activo: 1 },
-      { Estudio_Realizar_id: 1003, Estudio_id: 3, Nombre: 'US. Abdomen', Estatus_Est_id: 2, Observaciones: '', Medico_id: null, Letra_Est_Adic: null, Activo: 1 },
-      { Estudio_Realizar_id: 1004, Estudio_id: 7, Nombre: 'Ortopantomografía', Estatus_Est_id: 4, Observaciones: '', Medico_id: null, Letra_Est_Adic: null, Activo: 1 },
-      { Estudio_Realizar_id: 1005, Estudio_id: 15, Nombre: 'Oftalmología', Estatus_Est_id: 4, Observaciones: 'Sin observaciones', Medico_id: null, Letra_Est_Adic: null, Activo: 1 },
-      { Estudio_Realizar_id: 1006, Estudio_id: 100, Nombre: 'VIT. B 12, VITA D', Estatus_Est_id: 2, Observaciones: '', Medico_id: null, Letra_Est_Adic: 'A', Activo: 1 },
-    ],
-    val_corporal: { Peso: 0, Talla: 0 },
-  }
+interface ValCorporalDoc {
+  docId: string | null
+  peso: number
+  talla: number
+}
+
+async function fetchPadecimientos(): Promise<Padecimiento[]> {
+  const db = getFirebaseFirestore()
+  const snap = await getDocs(query(collection(db, 'padecimientos'), where('activo', '==', true)))
+  return snap.docs
+    .map((d) => ({ id: Number(d.id) || 0, nombre: (d.data().nombre as string) ?? '' }))
+    .filter((p) => p.id > 0)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
+/** Lee `val_corporal` (activo) del seguimiento. */
+async function fetchValCorporal(seguimientoId: string): Promise<ValCorporalDoc> {
+  const db = getFirebaseFirestore()
+  const snap = await getDocs(
+    query(
+      collection(db, 'val_corporal'),
+      where('seguimientoId', '==', seguimientoId),
+      where('activo', '==', true),
+    ),
+  )
+  if (snap.empty) return { docId: null, peso: 0, talla: 0 }
+  const d = snap.docs[0]
+  const data = d.data()
+  return { docId: d.id, peso: Number(data.peso) || 0, talla: Number(data.talla) || 0 }
+}
+
+/** Carga estudios adicionales (estudios_paciente con estudioId '100', activo). */
+async function fetchAdicionales(seguimientoId: string): Promise<AdicionalItem[]> {
+  const db = getFirebaseFirestore()
+  const snap = await getDocs(
+    query(
+      collection(db, 'estudios_paciente'),
+      where('seguimientoId', '==', seguimientoId),
+      where('estudioId', '==', ESTUDIO_ADICIONAL_ID),
+      where('activo', '==', true),
+    ),
+  )
+  return snap.docs.map((d) => {
+    const data = d.data()
+    return {
+      docId: d.id,
+      nombre: typeof data.nombre === 'string' ? data.nombre : '',
+      letra:
+        typeof data.letraMedico === 'string' && data.letraMedico.trim() !== ''
+          ? data.letraMedico.trim()
+          : null,
+    }
+  })
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -360,7 +388,7 @@ function SeguimientoPacientePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [seguimiento, setSeguimiento] = useState<SeguimientoData | null>(null)
-  const [catalogos, setCatalogos] = useState<Catalogos>(MOCK_CATALOGOS)
+  const [catalogos, setCatalogos] = useState<Catalogos>({ padecimientos: [] })
 
   // Formulario state
   const [desayuno, setDesayuno] = useState<number>(0)
@@ -377,8 +405,11 @@ function SeguimientoPacientePage() {
   const [horaEnvio, setHoraEnvio] = useState<string>('')
   const [observaciones, setObservaciones] = useState('')
 
-  // Estudios state (legacy — solo se usa para estudios adicionales)
-  const [estudios, setEstudios] = useState<EstudioRealizar[]>([])
+  // Estudios adicionales (Firestore estudios_paciente con estudioId '100')
+  const [adicionales, setAdicionales] = useState<AdicionalItem[]>([])
+
+  // Doc id de val_corporal (para upsert al guardar)
+  const [valDocId, setValDocId] = useState<string | null>(null)
 
   // Estudios del paquete (Firestore estudios_paciente)
   const [epMap, setEpMap] = useState<Record<number, EpCell>>({})
@@ -396,27 +427,62 @@ function SeguimientoPacientePage() {
     return () => { cancel = true }
   }, [seguimientoId])
 
-  // Cargar datos
+  // Cargar datos desde Firestore (sin SAP / sin REST)
   useEffect(() => {
+    let cancel = false
     async function load() {
       setLoading(true)
       try {
-        const headers = await authHeaders()
-        const res = await fetch(`${API_BASE}/api/seguimiento/${seguimientoId}`, { headers })
-        if (res.ok) {
-          const data = await res.json()
-          applyData(data.seguimiento, data.catalogos)
-        } else {
-          // Fallback a mock
-          applyData(getMockSeguimiento(seguimientoId), MOCK_CATALOGOS)
+        const db = getFirebaseFirestore()
+        const segSnap = await getDoc(doc(db, 'seguimientos', seguimientoId))
+        if (!segSnap.exists()) {
+          if (!cancel) setSeguimiento(null)
+          return
         }
+        const seg = segSnap.data()
+
+        const [pacSnap, paqSnap, val, padecimientos, ads] = await Promise.all([
+          seg.pacienteId
+            ? getDoc(doc(db, 'pacientes', String(seg.pacienteId)))
+            : Promise.resolve(null),
+          seg.paqueteId
+            ? getDoc(doc(db, 'paquetes', String(seg.paqueteId)))
+            : Promise.resolve(null),
+          fetchValCorporal(seguimientoId),
+          fetchPadecimientos(),
+          fetchAdicionales(seguimientoId),
+        ])
+        if (cancel) return
+
+        const pac = pacSnap?.exists() ? pacSnap.data() : undefined
+        const data: SeguimientoData = {
+          Seguimiento_id: Number(seguimientoId) || 0,
+          Nombre_Completo: buildPacienteNombre(pac),
+          Edad: calcEdad(pac?.fechaNacimiento) ?? 0,
+          Nombre_Paquete: (paqSnap?.exists() ? (paqSnap.data().nombre as string) : '') ?? '',
+          Desayuno: (Number(seg.desayuno) || 0) as 0 | 1 | 2,
+          Padecimiento_id: Number(seg.padecimientoId) || 0,
+          Medico_id: seg.medicoInternistaId != null ? String(seg.medicoInternistaId) : null,
+          Estatus_Valpac_id: Number(seg.estatusValpac) || 0,
+          Fecha_Ent_Resultados: seg.fechaEntrega ?? null,
+          Hora_Ent_Resultados: seg.horaEntrega ?? null,
+          Fecha_Envio_Resultados: seg.fechaEnvio ?? null,
+          Hora_Envio_Resultados: seg.horaEnvio ?? null,
+          Observaciones: seg.observaciones ?? '',
+          estudios: [],
+          val_corporal: { Peso: val.peso, Talla: val.talla },
+        }
+        applyData(data, { padecimientos })
+        setValDocId(val.docId)
+        setAdicionales(ads)
       } catch {
-        // Fallback a mock
-        applyData(getMockSeguimiento(seguimientoId), MOCK_CATALOGOS)
+        if (!cancel) setSeguimiento(null)
+      } finally {
+        if (!cancel) setLoading(false)
       }
-      setLoading(false)
     }
     load()
+    return () => { cancel = true }
   }, [seguimientoId])
 
   function applyData(seg: SeguimientoData, cats: Catalogos) {
@@ -435,45 +501,59 @@ function SeguimientoPacientePage() {
     setHoraEnvio(cleanTime(seg.Hora_Envio_Resultados))
     setEnviar(!!seg.Fecha_Envio_Resultados && seg.Fecha_Envio_Resultados !== '0000-00-00')
     setObservaciones(seg.Observaciones ?? '')
-    setEstudios(seg.estudios.filter((e) => e.Activo === 1))
   }
 
-  // Guardar seguimiento
+  // Guardar seguimiento en Firestore
   const handleGuardar = useCallback(async () => {
     setSaving(true)
     try {
-      const headers = await authHeaders()
-      const body = {
-        Desayuno: desayuno,
-        Padecimiento_id: padecimientoId,
-        Medico_id: medicoId,
-        Estatus_Valpac_id: estatusValpac,
-        Fecha_Ent_Resultados: fechaEntrega || null,
-        Hora_Ent_Resultados: horaEntrega ? `${horaEntrega}:00` : null,
-        EntregaRes: entregados ? 1 : 0,
-        EnviaRes: enviar ? 1 : 0,
-        Fecha_Envio_Resultados: fechaEnvio || null,
-        Hora_Envio_Resultados: horaEnvio ? `${horaEnvio}:00` : null,
-        Observaciones: observaciones,
-        Peso: parseFloat(peso) || 0,
-        Talla: parseFloat(talla) || 0,
-      }
-      const res = await fetch(`${API_BASE}/api/seguimiento/${seguimientoId}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify(body),
+      const db = getFirebaseFirestore()
+      const uid = getFirebaseAuth().currentUser?.uid ?? 'system'
+
+      await updateDoc(doc(db, 'seguimientos', seguimientoId), {
+        desayuno,
+        padecimientoId,
+        medicoInternistaId: medicoId,
+        estatusValpac,
+        fechaEntrega: entregados ? (fechaEntrega || null) : null,
+        horaEntrega: entregados && horaEntrega ? `${horaEntrega}:00` : null,
+        tarjetaEntRes: entregados ? 1 : 0,
+        fechaEnvio: enviar ? (fechaEnvio || null) : null,
+        horaEnvio: enviar && horaEnvio ? `${horaEnvio}:00` : null,
+        observaciones,
+        updatedBy: uid,
+        updatedAt: serverTimestamp(),
       })
-      if (res.ok) {
-        showToast('Seguimiento guardado exitosamente', 'success')
-        setTimeout(() => router.history.back(), 1500)
+
+      const pesoNum = parseFloat(peso) || 0
+      const tallaNum = parseFloat(talla) || 0
+      if (valDocId) {
+        await updateDoc(doc(db, 'val_corporal', valDocId), { peso: pesoNum, talla: tallaNum })
       } else {
-        showToast('Error al guardar seguimiento', 'error')
+        const ref = await addDoc(collection(db, 'val_corporal'), {
+          seguimientoId,
+          peso: pesoNum,
+          talla: tallaNum,
+          activo: true,
+        })
+        setValDocId(ref.id)
       }
+
+      // Reflejar cambios operativos en la cache de Lista del Día
+      updateListaDiaCache(fechaHoy, seguimientoId, {
+        desayuno: desayuno as 0 | 1 | 2,
+        estatusValpac: estatusValpac as 0 | 1 | 2,
+        peso: pesoNum,
+        talla: tallaNum,
+      })
+
+      showToast('Seguimiento guardado exitosamente', 'success')
+      setTimeout(() => router.history.back(), 1500)
     } catch {
-      showToast('Error de conexión', 'error')
+      showToast('Error al guardar seguimiento', 'error')
     }
     setSaving(false)
-  }, [seguimientoId, desayuno, padecimientoId, medicoId, estatusValpac, fechaEntrega, horaEntrega, entregados, enviar, fechaEnvio, horaEnvio, observaciones, peso, talla, router])
+  }, [seguimientoId, desayuno, padecimientoId, medicoId, estatusValpac, fechaEntrega, horaEntrega, entregados, enviar, fechaEnvio, horaEnvio, observaciones, peso, talla, valDocId, updateListaDiaCache, fechaHoy, router])
 
   // Asignar médico al estudio del paquete (Firestore estudios_paciente)
   const handleMedicoEstudioChange = useCallback((estudioColId: number, medicoId: string | null) => {
@@ -522,7 +602,7 @@ function SeguimientoPacientePage() {
       .catch(() => showToast('Error al guardar observaciones', 'error'))
   }, [seguimientoId, epMap])
 
-  // Agregar estudio adicional
+  // Agregar estudio adicional (Firestore estudios_paciente, estudioId '100')
   const handleAgregarAdicional = useCallback(async () => {
     if (!nuevoNombre.trim()) return
 
@@ -540,53 +620,37 @@ function SeguimientoPacientePage() {
     }
 
     try {
-      const headers = await authHeaders()
-      const res = await fetch(`${API_BASE}/api/seguimiento/${seguimientoId}/estudios-adicionales`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ Letra_Est_Adic: nuevaLetra, Nombre: nuevoNombre.trim() }),
+      const db = getFirebaseFirestore()
+      const ref = await addDoc(collection(db, 'estudios_paciente'), {
+        seguimientoId,
+        estudioId: ESTUDIO_ADICIONAL_ID,
+        estatusEstudioId: '2',
+        medicoId: null,
+        letraMedico: nuevaLetra,
+        observaciones: '',
+        nombre: nuevoNombre.trim(),
+        activo: true,
       })
-      if (res.ok) {
-        const created = await res.json()
-        setEstudios((prev) => [...prev, { ...created, Activo: 1, Estudio_id: 100 }])
-        setNuevoNombre('')
-        showToast('Estudio adicional agregado', 'success')
-      }
-    } catch {
-      // Optimistic add for mock
-      const mockId = Date.now()
-      setEstudios((prev) => [...prev, {
-        Estudio_Realizar_id: mockId,
-        Estudio_id: 100,
-        Nombre: nuevoNombre.trim(),
-        Estatus_Est_id: 2,
-        Observaciones: '',
-        Medico_id: null,
-        Letra_Est_Adic: nuevaLetra,
-        Activo: 1,
-      }])
+      setAdicionales((prev) => [...prev, { docId: ref.id, nombre: nuevoNombre.trim(), letra: nuevaLetra }])
       setNuevoNombre('')
-      showToast('Estudio adicional agregado (local)', 'success')
+      showToast('Estudio adicional agregado', 'success')
+    } catch {
+      showToast('Error al agregar estudio adicional', 'error')
     }
   }, [seguimientoId, nuevaLetra, nuevoNombre, pacientesDia])
 
-  // Eliminar estudio adicional
-  const handleEliminarAdicional = useCallback(async (estudioRealizarId: number) => {
+  // Eliminar estudio adicional (soft delete: activo = false)
+  const handleEliminarAdicional = useCallback(async (docId: string) => {
     try {
-      const headers = await authHeaders()
-      await fetch(`${API_BASE}/api/seguimiento/${seguimientoId}/estudios-adicionales?estudio_realizar_id=${estudioRealizarId}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ Activo: 0 }),
-      })
+      const db = getFirebaseFirestore()
+      await updateDoc(doc(db, 'estudios_paciente', docId), { activo: false })
+      setAdicionales((prev) => prev.filter((a) => a.docId !== docId))
     } catch {
-      // continue
+      showToast('Error al eliminar estudio adicional', 'error')
     }
-    setEstudios((prev) => prev.filter((e) => e.Estudio_Realizar_id !== estudioRealizarId))
-  }, [seguimientoId])
+  }, [])
 
-  // Derivados — los adicionales siguen viniendo del API legacy
-  const estudiosAdicionales = estudios.filter((e) => e.Estudio_id === 100)
+  const estudiosAdicionales = adicionales
 
   if (loading) {
     return (
@@ -835,11 +899,11 @@ function SeguimientoPacientePage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {estudiosAdicionales.map((ea) => (
-                <div key={ea.Estudio_Realizar_id} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f3f4f6', borderRadius: '4px', padding: '4px 8px' }}>
-                  <span style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--color-primario)' }}>{ea.Letra_Est_Adic}</span>
-                  <span style={{ flex: 1, fontSize: '0.75rem' }}>{ea.Nombre}</span>
+                <div key={ea.docId} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f3f4f6', borderRadius: '4px', padding: '4px 8px' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--color-primario)' }}>{ea.letra}</span>
+                  <span style={{ flex: 1, fontSize: '0.75rem' }}>{ea.nombre}</span>
                   <button
-                    onClick={() => handleEliminarAdicional(ea.Estudio_Realizar_id)}
+                    onClick={() => handleEliminarAdicional(ea.docId)}
                     style={{ background: 'none', border: 'none', color: '#D32F2F', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
                     title="Eliminar"
                   >✕</button>

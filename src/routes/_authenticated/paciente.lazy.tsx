@@ -5,6 +5,7 @@ import {
   usePacientesDelDia,
   useCatalogos,
   usePacienteDetalle,
+  useCrearPaciente,
   useEditarPaciente,
   useToggleActivo,
   useSetTurno,
@@ -119,6 +120,7 @@ function RegistroPacientesPage() {
   const { data: detalle } = usePacienteDetalle(editandoId)
 
   // Mutations
+  const crearMut = useCrearPaciente()
   const editarMut = useEditarPaciente()
   const toggleMut = useToggleActivo()
   const setTurnoMut = useSetTurno()
@@ -155,6 +157,14 @@ function RegistroPacientesPage() {
   }, [successMsg, errorMsg])
 
   // Handlers
+  const handleNuevo = useCallback(() => {
+    setEditandoId(null)
+    setForm(EMPTY_FORM)
+    setVista('formulario')
+    setSuccessMsg('')
+    setErrorMsg('')
+  }, [])
+
   const handleEditar = useCallback((pac: PacienteRegistro) => {
     setEditandoId(pac.seguimientoId)
     setVista('formulario')
@@ -175,18 +185,33 @@ function RegistroPacientesPage() {
     setSuccessMsg('')
     setErrorMsg('')
 
-    if (!editandoId) return
-
     try {
-      await editarMut.mutateAsync({ seguimientoId: editandoId, data: form })
-      setSuccessMsg('Paciente actualizado correctamente.')
+      if (editandoId) {
+        await editarMut.mutateAsync({ seguimientoId: editandoId, data: form })
+        setSuccessMsg('Paciente actualizado correctamente.')
+      } else {
+        await crearMut.mutateAsync({
+          primerNombre: form.primerNombre,
+          segundoNombre: form.segundoNombre,
+          apellidoPaterno: form.apellidoPaterno,
+          apellidoMaterno: form.apellidoMaterno,
+          fechaNac: form.fechaNac,
+          genero: form.genero,
+          historia: form.historia,
+          paqueteId: form.paqueteId,
+          empresaId: form.empresaId,
+          turno: Number(form.turno),
+          fecha,
+        })
+        setSuccessMsg('Paciente registrado correctamente.')
+      }
       setVista('lista')
       setEditandoId(null)
       setForm(EMPTY_FORM)
     } catch {
-      setErrorMsg('Error al actualizar paciente.')
+      setErrorMsg(editandoId ? 'Error al actualizar paciente.' : 'Error al registrar paciente.')
     }
-  }, [editandoId, form, editarMut])
+  }, [editandoId, form, fecha, editarMut, crearMut])
 
   const handleCancelar = useCallback(async (seguimientoId: string) => {
     try {
@@ -273,7 +298,7 @@ function RegistroPacientesPage() {
      RENDER — VISTA LISTA
      ═══════════════════════════════════════════════════════════════════════ */
 
-  if (vista === 'lista' || !editandoId) {
+  if (vista === 'lista') {
     return (
       <div>
         <h1 className="page-title">Registro de Pacientes</h1>
@@ -296,6 +321,26 @@ function RegistroPacientesPage() {
           <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h2 style={{ color: '#ffffff', fontSize: '1rem', fontWeight: 600, margin: 0 }}>Lista de Pacientes</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={handleNuevo}
+                style={{
+                  minHeight: '36px',
+                  padding: '0 14px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: 'var(--color-acento)',
+                  color: '#ffffff',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+                title="Registrar nuevo paciente"
+              >
+                + Nuevo Paciente
+              </button>
               <input
                 type="date"
                 value={fecha}
@@ -527,14 +572,14 @@ function RegistroPacientesPage() {
      RENDER — VISTA FORMULARIO
      ═══════════════════════════════════════════════════════════════════════ */
 
-  const isSubmitting = editarMut.isPending
+  const isSubmitting = editarMut.isPending || crearMut.isPending
 
   return (
     <div>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
         <h1 className="page-title" style={{ marginBottom: 0 }}>
-          {`Editando Paciente #${editandoId}`}
+          {editandoId ? `Editando Paciente #${editandoId}` : 'Nuevo Paciente'}
         </h1>
         <button
           onClick={handleVolver}
@@ -746,7 +791,7 @@ function RegistroPacientesPage() {
               opacity: isSubmitting ? 0.6 : 1,
             }}
           >
-            {isSubmitting ? 'Procesando...' : 'Guardar Cambios'}
+            {isSubmitting ? 'Procesando...' : editandoId ? 'Guardar Cambios' : 'Registrar Paciente'}
           </button>
         </form>
       </div>

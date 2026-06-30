@@ -8,9 +8,15 @@ import {
   updateDoc,
   addDoc,
 } from 'firebase/firestore'
-import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase'
-import { nowMX, formatDateMX } from '@/lib/timezone'
-import { fetchTurnoOverrides, applyTurnoOverrides } from '@/lib/turno-overrides'
+import { getFirebaseFirestore } from '@/lib/firebase'
+import {
+  ESTUDIO_ADICIONAL_ID,
+  ESTUDIO_COL_IDS,
+  fetchEstudiosPacienteForSeguimientos,
+  fetchSeguimientosDelDia,
+  type EstudioPacienteRow,
+  type SeguimientoDelDia,
+} from '@/lib/pacientes-firestore'
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TIPOS
@@ -85,178 +91,77 @@ export function normalizeEstudios(
   return out
 }
 
-function cellFromEstatus(estatusId: number): EstudioCellState {
-  return { estatusId }
-}
-
-function buildEstudiosFromLegacy(
-  legacy: Record<number, number>,
-  overrides?: Partial<Record<number, Partial<EstudioCellState>>>,
-): Record<number, EstudioCellState> {
-  const out: Record<number, EstudioCellState> = {}
-  for (const [key, estatusId] of Object.entries(legacy)) {
-    const id = Number(key)
-    const base = cellFromEstatus(estatusId)
-    const extra = overrides?.[id]
-    out[id] = extra ? { ...base, ...extra } : base
-  }
-  return out
-}
-
 /* ═══════════════════════════════════════════════════════════════════════════
-   DATOS MOCK
+   FIRESTORE — construir filas desde seguimientos + estudios_paciente
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const PACIENTES_MOCK: PacienteListaDia[] = [
-  { seguimientoId: '73605', turno: 1, nombre: 'ALFREDO CANO JAUREGUI SEGURA MILLAN', desayuno: 0, estatusValpac: 2, padecimientoId: 0, medicoInternista: 'NEGREROS BALVANERA FABIOLA', paqueteId: 'DT0066', paqueteNombre: 'CHECK UP EMPRESA D', edad: 41, peso: 0, talla: 0, fechaEntrega: 'Tue Dec 31', horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: true, estudiosAdicionales: [
-    { id: 'ea-73605-1', nombre: 'VIT. B 12, VITA D', estatusEstId: 2, letraEstAdic: 'A', observaciones: null },
-    { id: 'ea-73605-2', nombre: 'HEMOGLOBINA GLICOSILADA', estatusEstId: 4, letraEstAdic: 'B', observaciones: 'Resultado normal' },
-  ], estudios: buildEstudiosFromLegacy({ 1: 4, 2: 4, 3: 2, 4: 1, 5: 1, 6: 1, 7: 4, 8: 1, 9: 6, 19: 6, 10: 1, 11: 1, 12: 1, 13: 6, 14: 1, 15: 4, 16: 1, 17: 1, 18: 1, 20: 1 }, { 7: { letraMedico: 'H' }, 15: { letraMedico: 'V' }, 16: { letraMedico: 'L' } }) },
-  { seguimientoId: '73607', turno: 2, nombre: 'SIXTA GUTIERREZ RIVERA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 50, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73608', turno: 3, nombre: 'ASAHI TOSHIYA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0040', paqueteNombre: 'CHECK UP EMPRESA C', edad: 45, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2, 7: 1, 8: 1, 9: 2, 19: 2, 10: 2, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73609', turno: 4, nombre: 'VERONICA ADRIANA BAÑUELOS SANCHEZ', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 38, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2, 7: 1, 8: 2, 9: 1, 19: 2, 10: 1, 11: 4, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73610', turno: 5, nombre: 'MARIO DE MARCHIS PARESCHI', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 55, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73611', turno: 6, nombre: 'MARIA GUADALUPE RUIZ DEL RIO', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 42, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73612', turno: 7, nombre: 'SABINA GARCIA ORTEGA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0066', paqueteNombre: 'CHECK UP EMPRESA D', edad: 48, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 4, 2: 2, 3: 2, 4: 2, 5: 2, 6: 1, 7: 1, 8: 2, 9: 1, 19: 2, 10: 1, 11: 5, 12: 5, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73613', turno: 8, nombre: 'JESUS AUGUSTO CARMONA COLINA', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 60, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73614', turno: 9, nombre: 'JAIME VELAZQUEZ BERUMEN', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 37, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 6, 10: 1, 11: 1, 12: 1, 13: 6, 14: 1, 15: 6, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73615', turno: 10, nombre: 'HEIDI PRAGER GUZMAN', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0040', paqueteNombre: 'CHECK UP EMPRESA C', edad: 44, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 4, 2: 2, 3: 2, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 6, 12: 6, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73616', turno: 11, nombre: 'MARIO ALFREDO DONIZ ISLAS', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 52, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 4, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 4, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73617', turno: 12, nombre: 'JOSE LUIS RAMIREZ PALOMARES', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 47, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73618', turno: 13, nombre: 'RICARDO EDDY MONTERRUBIO MORENO', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 35, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73619', turno: 14, nombre: 'MONICA ALVAREZ RIOS', desayuno: 0, estatusValpac: 0, padecimientoId: 0, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 39, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 2, 3: 2, 4: 2, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-  { seguimientoId: '73620', turno: 15, nombre: 'MARIO LUIS PRADO BABAYAN', desayuno: 0, estatusValpac: 0, padecimientoId: 1, medicoInternista: null, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', edad: 58, peso: 0, talla: 0, fechaEntrega: null, horaEntrega: null, tarjetaEntRes: 0, tieneAdicionales: false, estudios: buildEstudiosFromLegacy({ 1: 2, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 19: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1 }) },
-]
+function buildPacienteListaDia(
+  s: SeguimientoDelDia,
+  eps: EstudioPacienteRow[],
+): PacienteListaDia {
+  // Base: las 20 columnas fijas inicializadas en "Sin Estatus".
+  const estudios: Record<number, EstudioCellState> = {}
+  for (const id of ESTUDIO_COL_IDS) estudios[id] = { estatusId: 0 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   FIRESTORE — enriquecer estudios_paciente
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-interface EstudioPacienteFirestore {
-  docId: string
-  seguimientoId: string
-  estudioId: string
-  estatusEstudioId: string
-  medicoId: string | null
-  letraMedico: string | null
-}
-
-async function fetchEstudiosPacienteForSeguimientos(
-  seguimientoIds: string[],
-): Promise<EstudioPacienteFirestore[]> {
-  if (seguimientoIds.length === 0) return []
-
-  const db = getFirebaseFirestore()
-  const results: EstudioPacienteFirestore[] = []
-
-  // Firestore 'in' queries limited to 30 values
-  const chunks: string[][] = []
-  for (let i = 0; i < seguimientoIds.length; i += 30) {
-    chunks.push(seguimientoIds.slice(i, i + 30))
-  }
-
-  for (const chunk of chunks) {
-    const snap = await getDocs(
-      query(
-        collection(db, 'estudios_paciente'),
-        where('seguimientoId', 'in', chunk),
-        where('activo', '==', true),
-      ),
-    )
-    for (const d of snap.docs) {
-      const data = d.data()
-      results.push({
-        docId: d.id,
-        seguimientoId: String(data.seguimientoId ?? ''),
-        estudioId: String(data.estudioId ?? ''),
-        estatusEstudioId: String(data.estatusEstudioId ?? '0'),
-        medicoId: data.medicoId != null ? String(data.medicoId) : null,
-        letraMedico:
-          typeof data.letraMedico === 'string' && data.letraMedico.trim() !== ''
-            ? data.letraMedico.trim()
-            : null,
+  const adicionales: EstudioAdicionalListaDia[] = []
+  for (const ep of eps) {
+    if (ep.estudioId === ESTUDIO_ADICIONAL_ID) {
+      adicionales.push({
+        id: ep.docId,
+        nombre: ep.nombre ?? '',
+        estatusEstId: Number(ep.estatusEstudioId) || 0,
+        letraEstAdic: ep.letraMedico,
+        observaciones: ep.observaciones || null,
       })
+      continue
+    }
+    const key = Number(ep.estudioId)
+    if (!Number.isFinite(key) || !(key in estudios)) continue
+    estudios[key] = {
+      estatusId: Number(ep.estatusEstudioId) || 0,
+      medicoId: ep.medicoId,
+      letraMedico: ep.letraMedico,
+      estudiosPacienteId: ep.docId,
     }
   }
 
-  return results
-}
-
-function enrichPacientesWithFirestore(
-  pacientes: PacienteListaDia[],
-  estudiosPaciente: EstudioPacienteFirestore[],
-): PacienteListaDia[] {
-  if (estudiosPaciente.length === 0) return pacientes
-
-  const bySegEstudio = new Map<string, EstudioPacienteFirestore>()
-  for (const ep of estudiosPaciente) {
-    bySegEstudio.set(`${ep.seguimientoId}:${ep.estudioId}`, ep)
+  return {
+    seguimientoId: s.seguimientoId,
+    turno: s.turno,
+    nombre: s.nombre,
+    desayuno: s.desayuno,
+    estatusValpac: s.estatusValpac,
+    padecimientoId: s.padecimientoId,
+    medicoInternista: s.medicoInternista,
+    paqueteId: s.paqueteId,
+    paqueteNombre: s.paqueteNombre ?? '',
+    edad: s.edad ?? 0,
+    peso: s.peso ?? 0,
+    talla: s.talla ?? 0,
+    fechaEntrega: s.fechaEntrega,
+    horaEntrega: s.horaEntrega,
+    tarjetaEntRes: s.tarjetaEntRes,
+    tieneAdicionales: adicionales.length > 0,
+    estudiosAdicionales: adicionales,
+    estudios,
   }
-
-  return pacientes.map((pac) => {
-    const estudios = { ...pac.estudios }
-    let changed = false
-
-    for (const [estudioKey, cell] of Object.entries(estudios)) {
-      const ep = bySegEstudio.get(`${pac.seguimientoId}:${estudioKey}`)
-      if (!ep) continue
-      changed = true
-      estudios[Number(estudioKey)] = {
-        ...cell,
-        estatusId: Number(ep.estatusEstudioId) || cell.estatusId,
-        medicoId: ep.medicoId,
-        letraMedico: ep.letraMedico,
-        estudiosPacienteId: ep.docId,
-      }
-    }
-
-    return changed ? { ...pac, estudios } : pac
-  })
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   FETCH (con fallback a mock)
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
-
-async function fetchListaDiaRaw(fecha: string): Promise<PacienteListaDia[]> {
-  try {
-    const user = getFirebaseAuth().currentUser
-    const headers: HeadersInit = { 'Content-Type': 'application/json' }
-    if (user) {
-      const token = await user.getIdToken()
-      headers.Authorization = `Bearer ${token}`
-    }
-    const res = await fetch(`${API_BASE}/api/lista-dia?fecha=${fecha}`, { headers })
-    if (res.ok) {
-      const data = (await res.json()) as Array<Omit<PacienteListaDia, 'estudios'> & { estudios: Record<number, number | EstudioCellState> }>
-      return data.map((p) => ({
-        ...p,
-        estudios: normalizeEstudios(p.estudios),
-      }))
-    }
-  } catch {
-    // fallback
-  }
-  const hoy = formatDateMX(nowMX())
-  if (fecha !== hoy) return []
-  // Sin backend: reflejar los turnos cambiados en Registro de Pacientes
-  const overrides = await fetchTurnoOverrides()
-  return applyTurnoOverrides(PACIENTES_MOCK, overrides)
 }
 
 async function fetchListaDia(fecha: string): Promise<PacienteListaDia[]> {
-  const pacientes = await fetchListaDiaRaw(fecha)
-  if (pacientes.length === 0) return pacientes
+  const seguimientos = await fetchSeguimientosDelDia(fecha, true)
+  if (seguimientos.length === 0) return []
 
-  try {
-    const seguimientoIds = pacientes.map((p) => p.seguimientoId)
-    const estudiosPaciente = await fetchEstudiosPacienteForSeguimientos(seguimientoIds)
-    return enrichPacientesWithFirestore(pacientes, estudiosPaciente)
-  } catch {
-    return pacientes
+  const segIds = seguimientos.map((s) => s.seguimientoId)
+  const eps = await fetchEstudiosPacienteForSeguimientos(segIds)
+
+  const bySeg = new Map<string, EstudioPacienteRow[]>()
+  for (const ep of eps) {
+    const arr = bySeg.get(ep.seguimientoId)
+    if (arr) arr.push(ep)
+    else bySeg.set(ep.seguimientoId, [ep])
   }
+
+  return seguimientos.map((s) => buildPacienteListaDia(s, bySeg.get(s.seguimientoId) ?? []))
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

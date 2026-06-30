@@ -19,6 +19,8 @@ export interface Paciente {
   apeMaterno?: string
   fechaNacimiento?: Timestamp
   sexo?: string
+  /** Número de historia clínica (legacy: Historia). */
+  historia?: string
   telefono?: string
   email?: string
   activo: boolean
@@ -29,14 +31,38 @@ export interface Seguimiento {
   id: string
   pacienteId: string
   empresaId?: string
+  /** Paquete asignado (doc id en `paquetes`). */
+  paqueteId?: string
+  /** Turno de atención del día. */
+  turno?: number
   fechaIngresoUtc: Timestamp
   estatusSeguimiento: string
   observaciones?: string
   activo: boolean
+  // ─── Campos operacionales (editados en la pantalla de Detalle) ──────────────
+  desayuno?: 0 | 1 | 2
+  estatusValpac?: 0 | 1 | 2
+  padecimientoId?: number
+  /** Médico internista asignado (doc id en `medicos`). */
+  medicoInternistaId?: string | null
+  fechaEntrega?: string | null
+  horaEntrega?: string | null
+  fechaEnvio?: string | null
+  horaEnvio?: string | null
+  tarjetaEntRes?: 0 | 1 | 2
   createdBy: string
   updatedBy: string
   createdAt: Timestamp
   updatedAt: Timestamp
+}
+
+/** Valoración corporal del paciente (colección `val_corporal`). */
+export interface ValCorporal {
+  id: string
+  seguimientoId: string
+  peso: number
+  talla: number
+  activo: boolean
 }
 
 /** Factura / Movimiento de caja (colección `facturas`). */

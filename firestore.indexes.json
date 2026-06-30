@@ -50,6 +50,22 @@
         { "fieldPath": "estudioId", "order": "ASCENDING" },
         { "fieldPath": "activo", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "val_corporal",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "seguimientoId", "order": "ASCENDING" },
+        { "fieldPath": "activo", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "paquete_detalle",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "paqueteId", "order": "ASCENDING" },
+        { "fieldPath": "activo", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

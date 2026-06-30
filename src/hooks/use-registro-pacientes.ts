@@ -1,8 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { doc, setDoc } from 'firebase/firestore'
+import { Timestamp, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase'
-import { nowMX, formatDateMX } from '@/lib/timezone'
-import { fetchTurnoOverrides, applyTurnoOverrides } from '@/lib/turno-overrides'
+import { formatDateMX } from '@/lib/timezone'
+import { fetchActiveCatalog, sortByNombre } from '@/lib/firestore-catalog'
+import {
+  crearPacienteFirestore,
+  fetchSeguimientosDelDia,
+  type CrearPacienteInput,
+} from '@/lib/pacientes-firestore'
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TIPOS
@@ -15,7 +20,7 @@ export interface PacienteRegistro {
   turno: number
   paqueteId: string
   paqueteNombre: string | null
-  empresaId: number
+  empresaId: string
   fechaIngreso: string
   activo: boolean
 }
@@ -43,137 +48,83 @@ export interface Paquete {
 }
 
 export interface Empresa {
-  id: number
+  id: string
   nombre: string
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DATOS MOCK
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-const MOCK_PACIENTES: PacienteRegistro[] = [
-  { seguimientoId: '73605', pacienteId: 'P001', nombre: 'ALFREDO CANO JAUREGUI SEGURA MILLAN', turno: 1, paqueteId: 'DT0066', paqueteNombre: 'CHECK UP EMPRESA D', empresaId: 1, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73607', pacienteId: 'P002', nombre: 'SIXTA GUTIERREZ RIVERA', turno: 2, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', empresaId: 2, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73608', pacienteId: 'P003', nombre: 'ASAHI TOSHIYA', turno: 3, paqueteId: 'DT0040', paqueteNombre: 'CHECK UP EMPRESA C', empresaId: 3, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73609', pacienteId: 'P004', nombre: 'VERONICA ADRIANA BAÑUELOS SANCHEZ', turno: 4, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', empresaId: 1, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73610', pacienteId: 'P005', nombre: 'MARIO DE MARCHIS PARESCHI', turno: 5, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', empresaId: 4, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73611', pacienteId: 'P006', nombre: 'MARIA GUADALUPE RUIZ DEL RIO', turno: 6, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', empresaId: 2, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73612', pacienteId: 'P007', nombre: 'SABINA GARCIA ORTEGA', turno: 7, paqueteId: 'DT0066', paqueteNombre: 'CHECK UP EMPRESA D', empresaId: 3, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73613', pacienteId: 'P008', nombre: 'JESUS AUGUSTO CARMONA COLINA', turno: 8, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', empresaId: 1, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73614', pacienteId: 'P009', nombre: 'JAIME VELAZQUEZ BERUMEN', turno: 9, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', empresaId: 2, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73615', pacienteId: 'P010', nombre: 'HEIDI PRAGER GUZMAN', turno: 10, paqueteId: 'DT0040', paqueteNombre: 'CHECK UP EMPRESA C', empresaId: 4, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73616', pacienteId: 'P011', nombre: 'MARIO ALFREDO DONIZ ISLAS', turno: 11, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', empresaId: 1, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73617', pacienteId: 'P012', nombre: 'JOSE LUIS RAMIREZ PALOMARES', turno: 12, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', empresaId: 3, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73618', pacienteId: 'P013', nombre: 'RICARDO EDDY MONTERRUBIO MORENO', turno: 13, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', empresaId: 2, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73619', pacienteId: 'P014', nombre: 'MONICA ALVAREZ RIOS', turno: 14, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', empresaId: 4, fechaIngreso: formatDateMX(nowMX()), activo: true },
-  { seguimientoId: '73620', pacienteId: 'P015', nombre: 'MARIO LUIS PRADO BABAYAN', turno: 15, paqueteId: 'DT0028', paqueteNombre: 'CHECK UP BASICO', empresaId: 1, fechaIngreso: formatDateMX(nowMX()), activo: true },
-]
-
-const MOCK_PAQUETES: Paquete[] = [
-  { id: 'DT0001', nombre: 'CHECK UP CIDYT D' },
-  { id: 'DT0002', nombre: 'CHECK UP EJECUTIVO C Y D + TOMOGRAFIA' },
-  { id: 'DT0028', nombre: 'CHECK UP BASICO' },
-  { id: 'DT0040', nombre: 'CHECK UP EMPRESA C' },
-  { id: 'DT0050', nombre: 'CHECK UP EMPRESA B' },
-  { id: 'DT0066', nombre: 'CHECK UP EMPRESA D' },
-  { id: 'DT0070', nombre: 'CHECK UP EMPRESA A' },
-]
-
-const MOCK_EMPRESAS: Empresa[] = [
-  { id: 1, nombre: 'BANDAI' },
-  { id: 2, nombre: 'MEDICA SUR' },
-  { id: 3, nombre: 'TOYOTA' },
-  { id: 4, nombre: 'HONDA' },
-  { id: 5, nombre: 'SAMSUNG' },
-]
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   HELPERS
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
-
-async function getAuthHeaders(): Promise<HeadersInit> {
-  const headers: HeadersInit = { 'Content-Type': 'application/json' }
-  const user = getFirebaseAuth().currentUser
-  if (user) {
-    const token = await user.getIdToken()
-    headers.Authorization = `Bearer ${token}`
-  }
-  return headers
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   FETCH — Pacientes del Día
+   FETCH — Pacientes del Día (Firestore)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 async function fetchPacientesDelDia(fecha: string, activo: boolean): Promise<PacienteRegistro[]> {
-  try {
-    const headers = await getAuthHeaders()
-    const res = await fetch(
-      `${API_BASE}/api/pacientes?fecha=${fecha}&activo=${activo ? 1 : 0}`,
-      { headers },
-    )
-    if (res.ok) return await res.json()
-  } catch {
-    // fallback
-  }
-  const hoy = formatDateMX(nowMX())
-  if (fecha !== hoy) return []
-  // Sin backend: usamos datos mock pero aplicamos los turnos persistidos en Firestore
-  const overrides = await fetchTurnoOverrides()
-  return applyTurnoOverrides(MOCK_PACIENTES.filter((p) => p.activo === activo), overrides)
+  const seguimientos = await fetchSeguimientosDelDia(fecha, activo)
+  return seguimientos.map((s) => ({
+    seguimientoId: s.seguimientoId,
+    pacienteId: s.pacienteId,
+    nombre: s.nombre,
+    turno: s.turno,
+    paqueteId: s.paqueteId,
+    paqueteNombre: s.paqueteNombre,
+    empresaId: s.empresaId,
+    fechaIngreso: s.fechaIngreso,
+    activo: s.activo,
+  }))
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FETCH — Catálogos (paquetes + empresas)
+   FETCH — Catálogos (paquetes + empresas) desde Firestore
    ═══════════════════════════════════════════════════════════════════════════ */
 
 async function fetchCatalogos(): Promise<{ paquetes: Paquete[]; empresas: Empresa[] }> {
-  try {
-    const headers = await getAuthHeaders()
-    const [resPaq, resEmp] = await Promise.all([
-      fetch(`${API_BASE}/api/catalogos/paquetes`, { headers }),
-      fetch(`${API_BASE}/api/catalogos/empresas`, { headers }),
-    ])
-    if (resPaq.ok && resEmp.ok) {
-      const paquetes: Paquete[] = await resPaq.json()
-      const empresas: Empresa[] = await resEmp.json()
-      return { paquetes, empresas }
-    }
-  } catch {
-    // fallback
-  }
-  return { paquetes: MOCK_PAQUETES, empresas: MOCK_EMPRESAS }
+  const [paquetes, empresas] = await Promise.all([
+    fetchActiveCatalog<Paquete>(
+      'paquetes',
+      (id, data) => ({ id, nombre: (data.nombre as string) ?? id }),
+      sortByNombre,
+    ),
+    fetchActiveCatalog<Empresa>(
+      'empresas',
+      (id, data) => ({ id, nombre: (data.nombre as string) ?? id }),
+      sortByNombre,
+    ),
+  ])
+  return { paquetes, empresas }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FETCH — Detalle Paciente (para editar)
+   FETCH — Detalle Paciente (para editar) desde Firestore
    ═══════════════════════════════════════════════════════════════════════════ */
 
+function tsToDateInput(value: unknown): string {
+  const d = value instanceof Timestamp ? value.toDate() : null
+  if (!d || Number.isNaN(d.getTime())) return ''
+  return formatDateMX(d)
+}
+
 async function fetchPacienteDetalle(seguimientoId: string): Promise<PacienteDetalle> {
-  try {
-    const headers = await getAuthHeaders()
-    const res = await fetch(`${API_BASE}/api/pacientes/${seguimientoId}`, { headers })
-    if (res.ok) return await res.json()
-  } catch {
-    // fallback
+  const db = getFirebaseFirestore()
+  const segSnap = await getDoc(doc(db, 'seguimientos', seguimientoId))
+  if (!segSnap.exists()) throw new Error('Seguimiento no encontrado')
+  const seg = segSnap.data()
+
+  let pac: Record<string, unknown> = {}
+  if (seg.pacienteId) {
+    const pacSnap = await getDoc(doc(db, 'pacientes', String(seg.pacienteId)))
+    if (pacSnap.exists()) pac = pacSnap.data()
   }
-  // Mock: retornar datos genéricos basados en el mock de la lista
-  const pac = MOCK_PACIENTES.find((p) => p.seguimientoId === seguimientoId)
-  const partes = (pac?.nombre ?? 'JORGE QUAN LAO').split(' ')
+
   return {
     seguimientoId,
-    primerNombre: partes[0] ?? '',
-    segundoNombre: partes.length > 3 ? partes[1] : '',
-    apellidoPaterno: partes.length > 3 ? partes[2] : partes[1] ?? '',
-    apellidoMaterno: partes.length > 3 ? partes.slice(3).join(' ') : partes[2] ?? '',
-    fechaNac: '1957-08-09',
-    genero: '',
-    historia: '1000038465',
-    paqueteId: pac?.paqueteId ?? 'DT0001',
-    empresaId: String(pac?.empresaId ?? 1),
-    turno: String(pac?.turno ?? 1),
+    primerNombre: (pac.nombre1 as string) ?? '',
+    segundoNombre: (pac.nombre2 as string) ?? '',
+    apellidoPaterno: (pac.apePaterno as string) ?? '',
+    apellidoMaterno: (pac.apeMaterno as string) ?? '',
+    fechaNac: tsToDateInput(pac.fechaNacimiento),
+    genero: (pac.sexo as string) ?? '',
+    historia: (pac.historia as string) ?? '',
+    paqueteId: (seg.paqueteId as string) ?? '',
+    empresaId: (seg.empresaId as string) ?? '',
+    turno: String(seg.turno ?? ''),
   }
 }
 
@@ -204,65 +155,85 @@ export function usePacienteDetalle(seguimientoId: string | null) {
   })
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   MUTACIONES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export function useCrearPaciente() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: CrearPacienteInput) => crearPacienteFirestore(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['registro-pacientes'] })
+      qc.invalidateQueries({ queryKey: ['lista-dia-pacientes'] })
+      qc.invalidateQueries({ queryKey: ['lista-caja-pacientes'] })
+    },
+  })
+}
+
 export function useEditarPaciente() {
   const qc = useQueryClient()
 
   return useMutation({
     mutationFn: async ({ seguimientoId, data }: { seguimientoId: string; data: PacienteFormData }) => {
-      const headers = await getAuthHeaders()
-      const res = await fetch(`${API_BASE}/api/pacientes/${seguimientoId}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
-          Primer_Nombre: data.primerNombre.trim().toUpperCase(),
-          Segundo_Nombre: data.segundoNombre.trim().toUpperCase(),
-          Apellido_Paterno: data.apellidoPaterno.trim().toUpperCase(),
-          Apellido_Materno: data.apellidoMaterno.trim().toUpperCase(),
-          Fecha_Nac: data.fechaNac,
-          Genero: data.genero,
-          Historia: data.historia.trim().toUpperCase(),
-          Paquete_id: data.paqueteId,
-          Empresa_id: Number(data.empresaId),
-          Turno: Number(data.turno),
-        }),
+      const db = getFirebaseFirestore()
+      const uid = getFirebaseAuth().currentUser?.uid ?? 'system'
+
+      const segRef = doc(db, 'seguimientos', seguimientoId)
+      const segSnap = await getDoc(segRef)
+      if (!segSnap.exists()) throw new Error('Seguimiento no encontrado')
+      const pacienteId = String(segSnap.data().pacienteId ?? '')
+
+      if (pacienteId) {
+        await updateDoc(doc(db, 'pacientes', pacienteId), {
+          nombre1: data.primerNombre.trim().toUpperCase(),
+          nombre2: data.segundoNombre.trim().toUpperCase(),
+          apePaterno: data.apellidoPaterno.trim().toUpperCase(),
+          apeMaterno: data.apellidoMaterno.trim().toUpperCase(),
+          fechaNacimiento: data.fechaNac
+            ? Timestamp.fromDate(new Date(`${data.fechaNac}T00:00:00`))
+            : null,
+          sexo: data.genero || null,
+          historia: data.historia.trim().toUpperCase(),
+          updatedBy: uid,
+          updatedAt: serverTimestamp(),
+        })
+      }
+
+      await updateDoc(segRef, {
+        paqueteId: data.paqueteId,
+        empresaId: data.empresaId || null,
+        turno: Number(data.turno),
+        updatedBy: uid,
+        updatedAt: serverTimestamp(),
       })
-      if (!res.ok) throw new Error('Error al actualizar paciente')
-      return await res.json()
+
+      return { seguimientoId }
     },
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ['registro-pacientes'] })
       qc.invalidateQueries({ queryKey: ['paciente-detalle', variables.seguimientoId] })
+      qc.invalidateQueries({ queryKey: ['lista-dia-pacientes'] })
+      qc.invalidateQueries({ queryKey: ['lista-caja-pacientes'] })
     },
   })
 }
 
 /**
- * Cambia solo el turno de un paciente (edición inline en la tabla).
- * Escritura primaria: PATCH /api/pacientes/:id { Turno }.
- * Si el backend no responde, cae a Firestore `seguimientos/{id}.turno`.
+ * Cambia solo el turno de un paciente (edición inline en la tabla),
+ * persistiendo en `seguimientos/{id}.turno`.
  */
 export function useSetTurno() {
   const qc = useQueryClient()
 
   return useMutation({
     mutationFn: async ({ seguimientoId, turno }: { seguimientoId: string; turno: number }) => {
-      // Solo intentamos la API on-prem si está configurada (evita 404 contra el dev server)
-      if (API_BASE) {
-        try {
-          const headers = await getAuthHeaders()
-          const res = await fetch(`${API_BASE}/api/pacientes/${seguimientoId}`, {
-            method: 'PATCH',
-            headers,
-            body: JSON.stringify({ Turno: turno }),
-          })
-          if (res.ok) return { seguimientoId, turno }
-        } catch {
-          // fallback a Firestore
-        }
-      }
-      // Fallback Firestore: merge para crear el doc si aún no existe (datos mock)
       const db = getFirebaseFirestore()
-      await setDoc(doc(db, 'seguimientos', seguimientoId), { turno }, { merge: true })
+      await updateDoc(doc(db, 'seguimientos', seguimientoId), {
+        turno,
+        updatedAt: serverTimestamp(),
+      })
       return { seguimientoId, turno }
     },
     onMutate: async ({ seguimientoId, turno }) => {
@@ -293,17 +264,17 @@ export function useToggleActivo() {
 
   return useMutation({
     mutationFn: async ({ seguimientoId, activo }: { seguimientoId: string; activo: number }) => {
-      const headers = await getAuthHeaders()
-      const res = await fetch(`${API_BASE}/api/pacientes/${seguimientoId}/activo`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ Seguimiento_id: seguimientoId, Activo: activo }),
+      const db = getFirebaseFirestore()
+      await updateDoc(doc(db, 'seguimientos', seguimientoId), {
+        activo: activo === 1,
+        updatedAt: serverTimestamp(),
       })
-      if (!res.ok) throw new Error('Error al cambiar estado del paciente')
-      return await res.json()
+      return { seguimientoId, activo }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['registro-pacientes'] })
+      qc.invalidateQueries({ queryKey: ['lista-dia-pacientes'] })
+      qc.invalidateQueries({ queryKey: ['lista-caja-pacientes'] })
     },
   })
 }
