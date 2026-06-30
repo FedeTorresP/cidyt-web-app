@@ -5,7 +5,24 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
-## [3.8.1] — 2026-06-30
+## [3.9.0] — 2026-06-30
+
+### Seguridad — Firebase App Check (reCAPTCHA Enterprise)
+
+Se habilita Firebase App Check en el cliente web para que Firestore solo acepte tráfico proveniente de instancias legítimas de la app, mitigando abuso de API y acceso desde clientes no autorizados.
+
+#### Agregado
+- **Inicialización de App Check** en `src/lib/firebase.ts` con `ReCaptchaEnterpriseProvider` y `isTokenAutoRefreshEnabled`, protegida por la variable `VITE_FIREBASE_APPCHECK_SITE_KEY` (si falta la llave, no se inicializa y la app no se rompe)
+- **Soporte de debug token** solo en desarrollo (`import.meta.env.DEV`) para permitir `localhost`; nunca se activa en producción
+- **Variable de entorno** `VITE_FIREBASE_APPCHECK_SITE_KEY` en `.env.example`; en producción se entrega vía el secreto `FIREBASE_CONFIG_SECRET` (Secret Manager) e inlined en build
+
+#### Pendiente
+- Activar **Enforce** en la API de Cloud Firestore tras validar métricas de solicitudes verificadas
+- Verificación de App Check en las Cloud Functions de Python (fuera de alcance en esta versión)
+
+---
+
+## [3.8.1] — 2026-06-30 [`1c8934e`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/1c8934e)
 
 ### Alpha — flujo de pacientes 100% sobre Firestore (sin SAP)
 
@@ -29,7 +46,7 @@ Versión alpha solicitada antes de contar con las llaves de la VPC. La app deja 
 
 ---
 
-## [3.8.0] — 2026-06-29
+## [3.8.0] — 2026-06-29 [`f33e9d2`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/f33e9d2)
 
 ### Requerimientos de usuario final — turnos, internistas, externos y reportería
 
