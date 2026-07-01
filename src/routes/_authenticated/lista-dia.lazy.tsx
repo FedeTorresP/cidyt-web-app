@@ -506,15 +506,15 @@ function ListaDiaPage() {
         </div>
       ) : (
         <div style={{ borderRadius: '10px' }}>
-          <table className="border-collapse w-full bg-[var(--color-fondo-card)] table-fixed">
+          <table className="border-collapse bg-[var(--color-fondo-card)]" style={{ minWidth: '100%', tableLayout: 'fixed' }}>
             <thead className="bg-[var(--color-primario)] z-10" style={{ position: 'sticky', top: `${toolbarHeight}px` }}>
               <tr>
-                {/* Turno — sticky */}
-                <th className="sticky left-0 z-[11] bg-[var(--color-primario)] py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[40px]" style={{ paddingLeft: '1px', borderTopLeftRadius: '10px' }}>
+                {/* Turno */}
+                <th className="bg-[var(--color-primario)] py-1.5 text-center text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[40px]" style={{ paddingLeft: '1px', borderTopLeftRadius: '10px' }}>
                   Turno
                 </th>
-                {/* Nombre — sticky */}
-                <th className="sticky left-[20px] z-[11] bg-[var(--color-primario)] py-1.5 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[160px]" style={{ paddingLeft: '10px' }}>
+                {/* Nombre */}
+                <th className="bg-[var(--color-primario)] py-1.5 text-left text-[0.7rem] font-semibold text-white border-b-2 border-b-white/12 w-[160px]" style={{ paddingLeft: '10px' }}>
                   Nombre del Paciente
                 </th>
                 {/* Desayuno */}
@@ -572,18 +572,18 @@ function ListaDiaPage() {
 
                 return (
                   <tr key={pac.seguimientoId} style={{ backgroundColor: rowBgBase }}>
-                    {/* Turno — sticky */}
+                    {/* Turno */}
                     <td
-                      className="sticky left-0 z-[9] px-0 py-[4px] text-center border-b border-b-[var(--color-borde)]"
+                      className="px-0 py-[4px] text-center border-b border-b-[var(--color-borde)]"
                       style={{ backgroundColor: turnoBg }}
                     >
                       <span className="inline-flex items-center justify-center w-[18px] h-[18px] rounded-full bg-[rgba(10,31,92,0.08)] text-[var(--color-primario)] font-bold text-[0.7rem]">
                         {pac.turno}
                       </span>
                     </td>
-                    {/* Nombre — sticky */}
+                    {/* Nombre */}
                     <td
-                      className="sticky left-[40px] z-[9] py-[4px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden"
+                      className="py-[4px] border-b border-b-[var(--color-borde)] text-[0.7rem] leading-tight whitespace-normal break-words overflow-hidden"
                       style={{ backgroundColor: nombreBg, paddingLeft: '5px' }}
                     >
                       <div className="flex items-center gap-0.5">
