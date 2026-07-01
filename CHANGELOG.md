@@ -5,6 +5,28 @@ El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versio
 
 ---
 
+## [3.9.1] — 2026-07-01
+
+### Corregido — pipeline SAP escribe el esquema canónico de la app
+
+La ingesta de SAP (`sap-pipeline`) escribía un esquema legacy en snake_case y sin `fechaIngresoUtc`, por lo que los pacientes creados desde SAP nunca aparecían en Registro de Pacientes (la consulta filtra `seguimientos` por `activo` y rango de `fechaIngresoUtc`, y arma el nombre con campos camelCase). Se alinea la escritura con el mismo esquema que produce el alta manual (`crearPacienteFirestore`).
+
+#### Corregido
+- **`pacientes` / `seguimientos` en camelCase** (`nombre1`, `apePaterno`, `apeMaterno`, `pacienteId`, `paqueteId`, `createdAt`…), consumibles por la app sin transformación
+- **`seguimiento.fechaIngresoUtc`** (Timestamp) para que el filtro por día de Registro de Pacientes / Lista del Día / Caja encuentre al paciente
+- **Estudios** sembrados en `estudios_paciente` desde `paquete_detalle` (antes escribía la colección deprecada `estudios_realizar`)
+
+#### Modificado
+- **Fecha de ingreso derivada de `patFechaCita`** (con respaldo a hoy si SAP no la envía), en alta y actualización, para que el paciente aparezca en el día de su cita
+- **Género normalizado a `M`/`F`**; cualquier otro valor de `patGenero` se guarda como `null`
+- **Actualización (upsert) de SAP** sincroniza solo campos de SAP (paquete, empresa, fecha de cita) sin sobrescribir los campos operativos capturados en la app
+
+#### Pendiente
+- Redeploy del contenedor On-Prem (`docker compose up -d --build`) para publicar el cambio
+- Limpieza de citas de prueba en esquema legacy (dedup por `No_Cita` en `interface_ipad`)
+
+---
+
 ## [3.9.0] — 2026-06-30
 
 ### Seguridad — Firebase App Check (reCAPTCHA Enterprise)
