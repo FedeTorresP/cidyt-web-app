@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import {
   collection,
@@ -17,7 +18,10 @@ import {
   type EstudioPacienteRow,
   type SeguimientoDelDia,
 } from '@/lib/pacientes-firestore'
-import { LISTA_CAJA_QUERY_KEY } from './use-lista-caja'
+import {
+  useSeguimientosDiaSync,
+  type SeguimientosDiaSnapshot,
+} from './use-seguimientos-dia-sync'
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TIPOS
@@ -149,6 +153,14 @@ function buildPacienteListaDia(
   }
 }
 
+/** Construye las filas de Lista del Día a partir de un snapshot combinado. */
+function buildListaDiaFromSnapshot({
+  seguimientos,
+  epBySeg,
+}: SeguimientosDiaSnapshot): PacienteListaDia[] {
+  return seguimientos.map((s) => buildPacienteListaDia(s, epBySeg.get(s.seguimientoId) ?? []))
+}
+
 async function fetchListaDia(fecha: string): Promise<PacienteListaDia[]> {
   const seguimientos = await fetchSeguimientosDelDia(fecha, true)
   if (seguimientos.length === 0) return []
@@ -233,10 +245,30 @@ export function buildEstudioCellUpdate(
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export function useListaDia(fecha: string) {
-  return useQuery({
+  const qc = useQueryClient()
+
+  const result = useQuery({
     queryKey: [...LISTA_DIA_QUERY_KEY, fecha],
     queryFn: () => fetchListaDia(fecha),
+    // El listener onSnapshot es la fuente viva: sin polling ni refetch por foco.
+    staleTime: Infinity,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   })
+
+  const handleSnapshot = useCallback(
+    (snapshot: SeguimientosDiaSnapshot) => {
+      qc.setQueryData<PacienteListaDia[]>(
+        [...LISTA_DIA_QUERY_KEY, fecha],
+        buildListaDiaFromSnapshot(snapshot),
+      )
+    },
+    [qc, fecha],
+  )
+
+  useSeguimientosDiaSync(fecha, handleSnapshot)
+
+  return result
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -319,9 +351,9 @@ export function useUpdateEstudioPaciente(fecha: string) {
         )
       }
       // Correlación con Lista de Pacientes Caja: la fuente de verdad es
-      // `estudios_paciente` (ya persistido). Invalidamos el cache de Caja para
-      // que refleje el nuevo estatus al mostrarse.
-      qc.invalidateQueries({ queryKey: LISTA_CAJA_QUERY_KEY })
+      // `estudios_paciente` (ya persistido). El listener onSnapshot de Caja
+      // propaga el nuevo estatus en tiempo real (mismo dispositivo u otros iPad),
+      // por lo que ya no se invalida el cache de Caja manualmente.
     },
   })
 }

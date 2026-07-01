@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ESTUDIO_ADICIONAL_ID,
   ESTUDIO_COL_IDS,
@@ -7,6 +8,10 @@ import {
   type EstudioPacienteRow,
   type SeguimientoDelDia,
 } from '@/lib/pacientes-firestore'
+import {
+  useSeguimientosDiaSync,
+  type SeguimientosDiaSnapshot,
+} from './use-seguimientos-dia-sync'
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TIPOS
@@ -72,6 +77,14 @@ function buildPacienteCaja(s: SeguimientoDelDia, eps: EstudioPacienteRow[]): Pac
   }
 }
 
+/** Construye las filas de Caja a partir de un snapshot combinado. */
+function buildListaCajaFromSnapshot({
+  seguimientos,
+  epBySeg,
+}: SeguimientosDiaSnapshot): PacienteCaja[] {
+  return seguimientos.map((s) => buildPacienteCaja(s, epBySeg.get(s.seguimientoId) ?? []))
+}
+
 async function fetchListaCaja(fecha: string): Promise<PacienteCaja[]> {
   const seguimientos = await fetchSeguimientosDelDia(fecha, true)
   if (seguimientos.length === 0) return []
@@ -94,8 +107,28 @@ async function fetchListaCaja(fecha: string): Promise<PacienteCaja[]> {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export function useListaCaja(fecha: string) {
-  return useQuery({
+  const qc = useQueryClient()
+
+  const result = useQuery({
     queryKey: [...LISTA_CAJA_QUERY_KEY, fecha],
     queryFn: () => fetchListaCaja(fecha),
+    // El listener onSnapshot es la fuente viva: sin polling ni refetch por foco.
+    staleTime: Infinity,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   })
+
+  const handleSnapshot = useCallback(
+    (snapshot: SeguimientosDiaSnapshot) => {
+      qc.setQueryData<PacienteCaja[]>(
+        [...LISTA_CAJA_QUERY_KEY, fecha],
+        buildListaCajaFromSnapshot(snapshot),
+      )
+    },
+    [qc, fecha],
+  )
+
+  useSeguimientosDiaSync(fecha, handleSnapshot)
+
+  return result
 }

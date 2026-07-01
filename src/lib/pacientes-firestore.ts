@@ -5,11 +5,14 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   serverTimestamp,
   where,
   writeBatch,
   type DocumentData,
+  type FirestoreError,
+  type Unsubscribe,
 } from 'firebase/firestore'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase'
 import { dayRangeMX, formatDateMX } from '@/lib/timezone'
@@ -118,6 +121,33 @@ export interface EstudioPacienteRow {
   nombre: string | null
 }
 
+/** Normaliza un doc de `estudios_paciente` a `EstudioPacienteRow`. */
+export function mapEstudioPacienteDoc(docId: string, data: DocumentData): EstudioPacienteRow {
+  const letra =
+    typeof data.letraMedico === 'string' && data.letraMedico.trim() !== ''
+      ? data.letraMedico.trim()
+      : null
+  return {
+    docId,
+    seguimientoId: String(data.seguimientoId ?? ''),
+    estudioId: String(data.estudioId ?? ''),
+    estatusEstudioId: String(data.estatusEstudioId ?? '0'),
+    medicoId: data.medicoId != null ? String(data.medicoId) : null,
+    letraMedico: letra,
+    observaciones: typeof data.observaciones === 'string' ? data.observaciones : '',
+    nombre: typeof data.nombre === 'string' ? data.nombre : null,
+  }
+}
+
+/** Divide ids en grupos de ≤30 (límite del operador `in` de Firestore). */
+export function chunkSeguimientoIds(seguimientoIds: string[]): string[][] {
+  const chunks: string[][] = []
+  for (let i = 0; i < seguimientoIds.length; i += 30) {
+    chunks.push(seguimientoIds.slice(i, i + 30))
+  }
+  return chunks
+}
+
 /** Lee `estudios_paciente` (activo) para varios seguimientos (chunks de 30). */
 export async function fetchEstudiosPacienteForSeguimientos(
   seguimientoIds: string[],
@@ -125,8 +155,7 @@ export async function fetchEstudiosPacienteForSeguimientos(
   if (seguimientoIds.length === 0) return []
   const db = getFirebaseFirestore()
   const out: EstudioPacienteRow[] = []
-  for (let i = 0; i < seguimientoIds.length; i += 30) {
-    const chunk = seguimientoIds.slice(i, i + 30)
+  for (const chunk of chunkSeguimientoIds(seguimientoIds)) {
     const snap = await getDocs(
       query(
         collection(db, 'estudios_paciente'),
@@ -134,25 +163,30 @@ export async function fetchEstudiosPacienteForSeguimientos(
         where('activo', '==', true),
       ),
     )
-    for (const d of snap.docs) {
-      const data = d.data()
-      const letra =
-        typeof data.letraMedico === 'string' && data.letraMedico.trim() !== ''
-          ? data.letraMedico.trim()
-          : null
-      out.push({
-        docId: d.id,
-        seguimientoId: String(data.seguimientoId ?? ''),
-        estudioId: String(data.estudioId ?? ''),
-        estatusEstudioId: String(data.estatusEstudioId ?? '0'),
-        medicoId: data.medicoId != null ? String(data.medicoId) : null,
-        letraMedico: letra,
-        observaciones: typeof data.observaciones === 'string' ? data.observaciones : '',
-        nombre: typeof data.nombre === 'string' ? data.nombre : null,
-      })
-    }
+    for (const d of snap.docs) out.push(mapEstudioPacienteDoc(d.id, d.data()))
   }
   return out
+}
+
+/**
+ * Escucha en tiempo real `estudios_paciente` (activo) de un chunk de ≤30
+ * `seguimientoId`. Devuelve el `Unsubscribe` para el cleanup.
+ */
+export function subscribeEstudiosPacienteChunk(
+  chunk: string[],
+  onNext: (rows: EstudioPacienteRow[]) => void,
+  onError: (error: FirestoreError) => void,
+): Unsubscribe {
+  const db = getFirebaseFirestore()
+  return onSnapshot(
+    query(
+      collection(db, 'estudios_paciente'),
+      where('seguimientoId', 'in', chunk),
+      where('activo', '==', true),
+    ),
+    (snap) => onNext(snap.docs.map((d) => mapEstudioPacienteDoc(d.id, d.data()))),
+    onError,
+  )
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -183,6 +217,77 @@ export interface SeguimientoDelDia {
   talla: number | null
 }
 
+/** Doc de `seguimientos` sin resolver (id + data cruda). */
+export interface SeguimientoDocRaw {
+  id: string
+  data: DocumentData
+}
+
+/** Mapas auxiliares para resolver un seguimiento (nombres + antropometría). */
+export interface SeguimientoAuxMaps {
+  pacientesMap: Map<string, DocumentData>
+  paquetesMap: Map<string, DocumentData>
+  medicosMap: Map<string, DocumentData>
+  valMap: Map<string, { peso: number; talla: number }>
+}
+
+/**
+ * Resuelve los mapas auxiliares (paciente, paquete, médico, antropometría)
+ * para un conjunto de seguimientos crudos.
+ */
+export async function resolveSeguimientoAuxMaps(
+  rows: SeguimientoDocRaw[],
+): Promise<SeguimientoAuxMaps> {
+  const [pacientesMap, paquetesMap, medicosMap, valMap] = await Promise.all([
+    mapDocsByIds('pacientes', rows.map((r) => r.data.pacienteId)),
+    mapDocsByIds('paquetes', rows.map((r) => r.data.paqueteId)),
+    mapDocsByIds('medicos', rows.map((r) => r.data.medicoInternistaId)),
+    fetchValCorporalMap(rows.map((r) => r.id)),
+  ])
+  return { pacientesMap, paquetesMap, medicosMap, valMap }
+}
+
+/** Construye un `SeguimientoDelDia` a partir del doc crudo y los mapas auxiliares. */
+export function mapSeguimientoRow(
+  id: string,
+  data: DocumentData,
+  aux: SeguimientoAuxMaps,
+): SeguimientoDelDia {
+  const pac = data.pacienteId ? aux.pacientesMap.get(String(data.pacienteId)) : undefined
+  const paq = data.paqueteId ? aux.paquetesMap.get(String(data.paqueteId)) : undefined
+  const med = data.medicoInternistaId
+    ? aux.medicosMap.get(String(data.medicoInternistaId))
+    : undefined
+  const val = aux.valMap.get(id)
+  const fechaIngreso =
+    data.fechaIngreso ??
+    (data.fechaIngresoUtc?.toDate ? formatDateMX(data.fechaIngresoUtc.toDate()) : '')
+
+  return {
+    seguimientoId: id,
+    pacienteId: String(data.pacienteId ?? ''),
+    empresaId: String(data.empresaId ?? ''),
+    paqueteId: String(data.paqueteId ?? ''),
+    paqueteNombre: (paq?.nombre as string) ?? null,
+    turno: Number(data.turno) || 0,
+    fechaIngreso,
+    activo: data.activo !== false,
+    nombre: buildPacienteNombre(pac),
+    edad: calcEdad(pac?.fechaNacimiento),
+    sexo: pac?.sexo != null ? String(pac.sexo) : null,
+    desayuno: (Number(data.desayuno) || 0) as 0 | 1 | 2,
+    estatusValpac: (Number(data.estatusValpac) || 0) as 0 | 1 | 2,
+    padecimientoId: Number(data.padecimientoId) || 0,
+    medicoInternistaId: data.medicoInternistaId != null ? String(data.medicoInternistaId) : null,
+    medicoInternista: (med?.nombreCompleto as string) ?? null,
+    fechaEntrega: data.fechaEntrega ? String(data.fechaEntrega) : null,
+    horaEntrega: data.horaEntrega ? String(data.horaEntrega) : null,
+    tarjetaEntRes: (Number(data.tarjetaEntRes) || 0) as 0 | 1 | 2,
+    peso: val?.peso ?? null,
+    talla: val?.talla ?? null,
+  }
+}
+
 /**
  * Lee los seguimientos de un día (zona MX) con `activo` dado, resolviendo
  * nombre del paciente, nombre del paquete, médico internista y antropometría.
@@ -202,51 +307,36 @@ export async function fetchSeguimientosDelDia(
     ),
   )
 
-  const rows = snap.docs.map((d) => ({ id: d.id, data: d.data() }))
+  const rows: SeguimientoDocRaw[] = snap.docs.map((d) => ({ id: d.id, data: d.data() }))
   if (rows.length === 0) return []
 
-  const [pacientesMap, paquetesMap, medicosMap, valMap] = await Promise.all([
-    mapDocsByIds('pacientes', rows.map((r) => r.data.pacienteId)),
-    mapDocsByIds('paquetes', rows.map((r) => r.data.paqueteId)),
-    mapDocsByIds('medicos', rows.map((r) => r.data.medicoInternistaId)),
-    fetchValCorporalMap(rows.map((r) => r.id)),
-  ])
+  const aux = await resolveSeguimientoAuxMaps(rows)
+  return rows.map(({ id, data }) => mapSeguimientoRow(id, data, aux))
+}
 
-  return rows.map(({ id, data }) => {
-    const pac = data.pacienteId ? pacientesMap.get(String(data.pacienteId)) : undefined
-    const paq = data.paqueteId ? paquetesMap.get(String(data.paqueteId)) : undefined
-    const med = data.medicoInternistaId
-      ? medicosMap.get(String(data.medicoInternistaId))
-      : undefined
-    const val = valMap.get(id)
-    const fechaIngreso =
-      data.fechaIngreso ??
-      (data.fechaIngresoUtc?.toDate ? formatDateMX(data.fechaIngresoUtc.toDate()) : '')
-
-    return {
-      seguimientoId: id,
-      pacienteId: String(data.pacienteId ?? ''),
-      empresaId: String(data.empresaId ?? ''),
-      paqueteId: String(data.paqueteId ?? ''),
-      paqueteNombre: (paq?.nombre as string) ?? null,
-      turno: Number(data.turno) || 0,
-      fechaIngreso,
-      activo: data.activo !== false,
-      nombre: buildPacienteNombre(pac),
-      edad: calcEdad(pac?.fechaNacimiento),
-      sexo: pac?.sexo != null ? String(pac.sexo) : null,
-      desayuno: (Number(data.desayuno) || 0) as 0 | 1 | 2,
-      estatusValpac: (Number(data.estatusValpac) || 0) as 0 | 1 | 2,
-      padecimientoId: Number(data.padecimientoId) || 0,
-      medicoInternistaId: data.medicoInternistaId != null ? String(data.medicoInternistaId) : null,
-      medicoInternista: (med?.nombreCompleto as string) ?? null,
-      fechaEntrega: data.fechaEntrega ? String(data.fechaEntrega) : null,
-      horaEntrega: data.horaEntrega ? String(data.horaEntrega) : null,
-      tarjetaEntRes: (Number(data.tarjetaEntRes) || 0) as 0 | 1 | 2,
-      peso: val?.peso ?? null,
-      talla: val?.talla ?? null,
-    }
-  })
+/**
+ * Escucha en tiempo real los seguimientos activos de un día (zona MX). Emite
+ * los docs crudos (`SeguimientoDocRaw[]`); la resolución de mapas auxiliares se
+ * delega al consumidor para acotarla al cambio del conjunto de ids.
+ * Devuelve el `Unsubscribe` para el cleanup.
+ */
+export function subscribeSeguimientosDelDia(
+  fecha: string,
+  onNext: (rows: SeguimientoDocRaw[]) => void,
+  onError: (error: FirestoreError) => void,
+): Unsubscribe {
+  const db = getFirebaseFirestore()
+  const { start, end } = dayRangeMX(fecha)
+  return onSnapshot(
+    query(
+      collection(db, 'seguimientos'),
+      where('activo', '==', true),
+      where('fechaIngresoUtc', '>=', Timestamp.fromDate(start)),
+      where('fechaIngresoUtc', '<', Timestamp.fromDate(end)),
+    ),
+    (snap) => onNext(snap.docs.map((d) => ({ id: d.id, data: d.data() }))),
+    onError,
+  )
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

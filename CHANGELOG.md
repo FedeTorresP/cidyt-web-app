@@ -3,6 +3,27 @@
 Todos los cambios notables en este proyecto se documentan en este archivo.
 El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versionado **[Semántico](https://semver.org/)**.
 
+## [3.11.0] — 2026-07-01
+
+### Agregado — sincronización en tiempo real multi-iPad de Lista del Día y Caja
+
+Las vistas operativas del día (`Lista de Pacientes` y `Lista de Pacientes Caja`) ahora se sincronizan en tiempo real entre dispositivos mediante listeners `onSnapshot` de Firestore: un cambio hecho en un iPad se refleja en los demás sin recargar. Antes la correlación solo funcionaba dentro de la misma sesión vía invalidación de cache de react-query.
+
+#### Agregado
+- **Suscripciones en tiempo real** en `pacientes-firestore.ts`: `subscribeSeguimientosDelDia` (1 listener sobre el rango `fechaIngresoUtc` del día, `activo==true`) y `subscribeEstudiosPacienteChunk` (N listeners sobre `estudios_paciente` en chunks de ≤30 `seguimientoId`). Se extraen mappers puros reutilizables (`mapSeguimientoRow`, `mapEstudioPacienteDoc`, `resolveSeguimientoAuxMaps`, `chunkSeguimientoIds`) compartidos con las funciones de carga (`fetch*`)
+- **Motor de sincronización** `use-seguimientos-dia-sync.ts`: orquesta los listeners por `fecha`, re-suscribe los chunks de `estudios_paciente` solo cuando cambia el conjunto de `seguimientoId` (altas/bajas), resuelve los mapas auxiliares (paciente/paquete/médico/antropometría) únicamente al cambiar dicho conjunto, y hace cleanup de todos los listeners al desmontar y al cambiar de fecha
+- **Integración con TanStack Query**: `useListaDia` y `useListaCaja` empujan los snapshots al cache vía `setQueryData` (mismas keys) reutilizando `buildPacienteListaDia`/`buildPacienteCaja`; se configuran con `staleTime: Infinity`, `refetchInterval: false` y `refetchOnWindowFocus: false` para que el listener sea la fuente viva
+
+#### Cambiado
+- **Correlación Lista del Día → Caja** ahora es en tiempo real y cross-device: `useUpdateEstudioPaciente` ya no invalida manualmente el cache de Caja (`LISTA_CAJA_QUERY_KEY`); el listener `onSnapshot` de Caja propaga el nuevo estatus
+
+#### Notas
+- Las mutaciones optimistas actuales se conservan sin cambios: Firestore aplica *latency compensation* (el snapshot local refleja el `updateDoc/addDoc` antes del ack del servidor), por lo que convergen con la mutación optimista sin parpadeo ni reversión
+- No se modifican `firestore.rules` (lectura `if isAuth()`) ni `firestore.indexes.json` (los índices compuestos existentes ya cubren las queries en tiempo real). App Check sigue adjuntando tokens automáticamente a los streams de escucha; sin PII adicional
+- Prioridad 2 (dashboard de Cubículos y detalle de paciente) queda fuera de este cambio: Cubículos lee un REST no-Firestore y el detalle usa un formulario editable con estado local
+
+---
+
 ## [3.10.1] — 2026-07-01
 
 ### Corregido — estudios fuera del paquete se marcan como "No Incluido" en Lista del Día
