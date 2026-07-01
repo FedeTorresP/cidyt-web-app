@@ -3,7 +3,19 @@
 Todos los cambios notables en este proyecto se documentan en este archivo.
 El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versionado **[Semántico](https://semver.org/)**.
 
-## [3.11.0] — 2026-07-01
+## [3.11.1] — 2026-07-01
+
+### Corregido — Lista de Pacientes se ajusta al ancho disponible + alta manual oculta
+
+#### Corregido
+- **Lista de Pacientes se recortaba al alternar el sidebar**: la tabla usaba `w-full` + `table-fixed` (ancho fijo al 100%) y no se recomprimía en el landscape del iPad al mostrar el menú lateral. Se cambia a `minWidth: 100%` + `tableLayout: fixed` (misma estrategia que Lista de Pacientes Caja) y se elimina el `sticky` horizontal de las columnas **Turno** y **Nombre del Paciente** (cuyos offsets header/cuerpo no coincidían). El encabezado conserva el `sticky` vertical.
+
+#### Eliminado
+- **Botón "+ Nuevo Paciente" oculto** en `/paciente` (flag `ALTA_MANUAL_HABILITADA = false`): con `sap-pipeline` en producción los pacientes provienen de SAP; el alta manual se había reactivado solo para la versión alpha sin SAP. El formulario y `handleNuevo` se conservan intactos para edición y posible reactivación.
+
+---
+
+## [3.11.0] — 2026-07-01 [`308a29e`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/308a29e)
 
 ### Agregado — sincronización en tiempo real multi-iPad de Lista del Día y Caja
 
@@ -24,7 +36,7 @@ Las vistas operativas del día (`Lista de Pacientes` y `Lista de Pacientes Caja`
 
 ---
 
-## [3.10.1] — 2026-07-01
+## [3.10.1] — 2026-07-01 [`250fa5a`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/250fa5a)
 
 ### Corregido — estudios fuera del paquete se marcan como "No Incluido" en Lista del Día
 
@@ -42,7 +54,7 @@ En Lista de Pacientes (Lista del Día) las 20 columnas de estudio arrancaban en 
 
 ---
 
-## [3.10.0] — 2026-07-01
+## [3.10.0] — 2026-07-01 [`946cdde`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/946cdde)
 
 ### Seguridad — sistema de usuarios/roles (RBAC), cambio de contraseña obligatorio y lectura acotada de `usuarios`
 
@@ -67,7 +79,7 @@ Provisiona el modelo de usuarios y roles sobre custom claims, obliga el cambio d
 
 ---
 
-## [3.9.2] — 2026-07-01
+## [3.9.2] — 2026-07-01 [`28ac6e3`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/28ac6e3)
 
 ### Herramientas — auditoría de paquete_detalle y limpieza de datos legacy
 
@@ -90,7 +102,7 @@ Completa el lado app de la ingesta SAP: verificación de cobertura de estudios y
 
 ---
 
-## [3.9.1] — 2026-07-01
+## [3.9.1] — 2026-07-01 [`dedb3b8`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/dedb3b8)
 
 ### Corregido — pipeline SAP escribe el esquema canónico de la app
 
@@ -112,7 +124,7 @@ La ingesta de SAP (`sap-pipeline`) escribía un esquema legacy en snake_case y s
 
 ---
 
-## [3.9.0] — 2026-06-30
+## [3.9.0] — 2026-06-30 [`eb15b46`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/eb15b46)
 
 ### Seguridad — Firebase App Check (reCAPTCHA Enterprise)
 
@@ -211,7 +223,7 @@ SAP ECC (On-Premise) → Cloud Function (gen2, HTTPS) → [VPC core-red-comparti
 
 ---
 
-## [3.6.3] — 2026-06-23
+## [3.6.3] — 2026-06-23 [`5edcf13`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/5edcf13)
 
 ### Registro de Pacientes — sin alta manual (fuente SAP)
 
@@ -227,7 +239,7 @@ Los pacientes se ingresan desde SAP; la app solo consulta, edita y cancela/resta
 
 ---
 
-## [3.6.2] — 2026-06-23
+## [3.6.2] — 2026-06-23 [`c8c95da`](https://github.com/Medica-Sur-TI/cidyt-web-app/commit/c8c95da)
 
 ### Seguridad — cierre de sesión por inactividad (iPads compartidos)
 
