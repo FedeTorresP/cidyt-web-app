@@ -3,6 +3,27 @@
 Todos los cambios notables en este proyecto se documentan en este archivo.
 El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versionado **[Semántico](https://semver.org/)**.
 
+## [3.9.2] — 2026-07-01
+
+### Herramientas — auditoría de paquete_detalle y limpieza de datos legacy
+
+Completa el lado app de la ingesta SAP: verificación de cobertura de estudios y limpieza segura de datos de prueba para poder re-probar citas (el dedup por `noCita` en `interface_ipad` bloquea reenviar el mismo id).
+
+#### Agregado
+- **`scripts/audit-paquete-detalle.mjs`** (solo lectura): reporta paquetes activos sin renglones en `paquete_detalle` (grid de estudios vacío) y verifica `paqueteId` puntuales (ej. `--check=DT0007`)
+- **`scripts/cleanup-legacy.mjs`**: borrado seguro con dry-run por defecto (escritura solo con `--apply --yes` y `--project ipad-cidyt`); modo `--nocita=` (cita + `pacientes`/`seguimientos`/`val_corporal`/`estudios_paciente`/`estudios_realizar` vinculados) y `--legacy-scan` (pacientes snake_case, seguimientos sin `fechaIngresoUtc`, colección deprecada `estudios_realizar`)
+
+#### Modificado
+- **Índices Firestore reconciliados** en el proyecto: se desplegaron los declarados que faltaban (`paquete_detalle(paqueteId, activo)`, `estudios_paciente(seguimientoId, estudioId, activo)`, `val_corporal(seguimientoId, activo)`)
+
+#### Verificado
+- **`DT0007`** tiene 14 renglones de `paquete_detalle` activos (el grid se poblará)
+- **Detectados 75 paquetes activos sin detalle** en IPADCK (mayormente quirúrgicos `QX*`/`GK*`/`UR*` y check-ups sin export de detalle); se documenta para revisión, no es gap de sembrado
+
+#### Pendiente
+- Reenvío del paciente de prueba desde SAP (Cloud Function externa) y validación en la app
+- Definir/exportar `paquete_detalle` para los check-ups del segundo grupo si SAP los llega a enviar
+
 ---
 
 ## [3.9.1] — 2026-07-01
