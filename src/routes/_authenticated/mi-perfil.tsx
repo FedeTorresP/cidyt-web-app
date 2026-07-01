@@ -13,6 +13,7 @@ import { MoreHorizontal, ArrowUpDown, Plus, Search } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import {
   useUsuarios,
+  useCurrentUsuario,
   useUpdateNombreCompleto,
   useCreateUsuario,
   useDeactivateUsuario,
@@ -111,7 +112,7 @@ function PerfilBadge({ perfilId, perfilNombre }: { perfilId: string; perfilNombr
 
 function TabMiPerfil() {
   const { user } = useAuth()
-  const { data: usuarios } = useUsuarios()
+  const { data: currentUsuario } = useCurrentUsuario()
   const updateNombre = useUpdateNombreCompleto()
 
   // Estado de edición de nombre — 3 campos independientes
@@ -126,14 +127,6 @@ function TabMiPerfil() {
   const [pwLoading, setPwLoading] = useState(false)
   const [pwSuccess, setPwSuccess] = useState(false)
   const [pwError, setPwError] = useState<string | null>(null)
-
-  // Buscar el documento del usuario actual por UID o email
-  const currentUsuario = useMemo(() => {
-    if (!usuarios || !user) return null
-    return usuarios.find(
-      (u) => u.correoInstitucional === user.email,
-    ) ?? null
-  }, [usuarios, user])
 
   function handleStartEditName() {
     // Leer campos aditivos. Si es legacy (sin campos desglosados), dejar vacíos.

@@ -268,6 +268,47 @@ const HORARIOS = [
   { _id: '2', nombre: 'VESPERTINO', descripcion: 'VESPERTINO', horaInicio: '16:00', horaFin: '23:59', activo: true },
 ]
 
+/**
+ * permisos — Permisos atómicos del RBAC (doc id = clave).
+ * El id se referencia desde rol_permisos.permisoId y menu_items.requiredPermissionId.
+ */
+const PERMISOS = [
+  { _id: 'ver_caja', nombre: 'Ver Lista de Pacientes Caja', clave: 'ver_caja', activo: true },
+  { _id: 'ver_paciente', nombre: 'Ver Registro de Pacientes', clave: 'ver_paciente', activo: true },
+  { _id: 'ver_lista_dia', nombre: 'Ver Lista de Pacientes', clave: 'ver_lista_dia', activo: true },
+  { _id: 'ver_externos', nombre: 'Ver Registro Estudios Externos', clave: 'ver_externos', activo: true },
+]
+
+/**
+ * rol_permisos — Asignación de permisos por rol (doc id = `${roleId}_${permisoId}`).
+ * admin usa permissions:['*'] en sus claims, por eso NO requiere filas aquí.
+ */
+const ROL_PERMISOS = [
+  { _id: 'cidyt_ver_caja', roleId: 'cidyt', permisoId: 'ver_caja' },
+  { _id: 'cidyt_ver_paciente', roleId: 'cidyt', permisoId: 'ver_paciente' },
+  { _id: 'cidyt_ver_lista_dia', roleId: 'cidyt', permisoId: 'ver_lista_dia' },
+  { _id: 'cidyt_ver_externos', roleId: 'cidyt', permisoId: 'ver_externos' },
+  { _id: 'caja_ver_caja', roleId: 'caja', permisoId: 'ver_caja' },
+]
+
+/**
+ * menu_items — Menú lateral (doc id numérico).
+ * requiredPermissionId: null => visible para todos; 'admin' => solo admin/super admin;
+ * clave de permiso => visible si el rol tiene ese permiso (o es super admin).
+ */
+const MENU_ITEMS = [
+  { _id: '1', label: 'Registro de Pacientes', route: '/paciente', displayOrder: 1, requiredPermissionId: 'ver_paciente', activo: true },
+  { _id: '2', label: 'Lista de Pacientes', route: '/lista-dia', displayOrder: 2, requiredPermissionId: 'ver_lista_dia', activo: true },
+  { _id: '3', label: 'Lista de Pacientes Caja', route: '/caja', displayOrder: 3, requiredPermissionId: 'ver_caja', activo: true },
+  { _id: '4', label: 'Lugares', route: '/lugares', displayOrder: 4, requiredPermissionId: null, activo: true },
+  { _id: '5', label: 'Registro Estudios Externos', route: '/externos', displayOrder: 5, requiredPermissionId: 'ver_externos', activo: true },
+  { _id: '6', label: 'Reportería', route: '/reportes', displayOrder: 6, requiredPermissionId: 'admin', activo: true },
+  { _id: '7', label: 'Mi Perfil y Accesos', route: '/mi-perfil', displayOrder: 7, requiredPermissionId: null, activo: true },
+  { _id: '8', label: 'Lista Cubículos', route: '/cubiculo/listado', displayOrder: 8, requiredPermissionId: null, activo: true },
+  { _id: '9', label: 'Crear Paquetes', route: '/paquetes', displayOrder: 9, requiredPermissionId: 'admin', activo: true },
+  { _id: '10', label: 'Mantenimiento Catálogos', route: '/catalogos', displayOrder: 10, requiredPermissionId: 'admin', activo: true },
+]
+
 // ─── Catálogos grandes (se leen de scripts/data/*.json) ──────────────────────
 //
 // Coloca el JSON exportado de IPADCK en scripts/data/ con estos nombres:
@@ -450,6 +491,11 @@ async function main() {
   await seedCollection('lugar_estudio', LUGAR_ESTUDIO)
   await seedCollection('padecimientos', PADECIMIENTOS)
   await seedCollection('horarios', HORARIOS)
+
+  // ─── RBAC (permisos, rol_permisos, menu_items) ───────────────────────────
+  await seedCollection('permisos', PERMISOS)
+  await seedCollection('rol_permisos', ROL_PERMISOS)
+  await seedCollection('menu_items', MENU_ITEMS)
 
   // ─── Catálogos grandes (desde JSON) ──────────────────────────────────────
   await seedCollectionBatched('empresas', loadCatalog('empresas'))

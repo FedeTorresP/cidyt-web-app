@@ -1,12 +1,16 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/use-auth'
 import { useInactivityLogout } from '@/hooks/use-inactivity-logout'
 import { useMenu } from '@/hooks/use-menu'
 import { endSession } from '@/services/session'
+import { getMustChangePassword } from '@/services/users'
 import { SidebarNav } from './SidebarNav'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { AlertBanner } from '@/components/shared/AlertBanner'
+
+const CAMBIO_CLAVE_PATH = '/cambio-clave'
 
 export function AppShell() {
   const navigate = useNavigate()
@@ -15,6 +19,26 @@ export function AppShell() {
   const isCubiculos = location.pathname === '/cubiculo/listado'
   const { data: menuItems, isLoading: menuLoading, error: menuError } = useMenu()
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  // ─── Gate de cambio de contraseña obligatorio ──────────────────────────────
+  // Bloquea TODA la app (no evadible por URL, porque todo pasa por AppShell)
+  // hasta que el usuario cambie su contraseña en /cambio-clave.
+  const uid = user?.uid
+  const { data: mustChangePassword, isLoading: gateLoading } = useQuery({
+    queryKey: ['must-change-pw', uid],
+    queryFn: () => getMustChangePassword(uid!),
+    enabled: !!uid,
+    staleTime: 0,
+  })
+
+  const onCambioClave = location.pathname === CAMBIO_CLAVE_PATH
+  const needsPasswordChange = mustChangePassword === true
+
+  useEffect(() => {
+    if (needsPasswordChange && !onCambioClave) {
+      navigate({ to: CAMBIO_CLAVE_PATH, replace: true })
+    }
+  }, [needsPasswordChange, onCambioClave, navigate])
 
   // Derivar nombre de usuario (mayúsculas como legacy)
   const userName = (
@@ -41,6 +65,37 @@ export function AppShell() {
   }, [navigate])
 
   useInactivityLogout(handleLogout)
+
+  // Esperar la resolución del gate para evitar mostrar la app antes del bloqueo.
+  if (uid && gateLoading) {
+    return (
+      <div className="flex items-center justify-center" style={{ minHeight: '100dvh' }}>
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  // Cambio de contraseña obligatorio: layout mínimo sin menú ni navegación.
+  // Solo se renderiza el formulario (/cambio-clave); cualquier otra ruta muestra
+  // spinner mientras el efecto redirige.
+  if (needsPasswordChange) {
+    return (
+      <div
+        className="flex flex-col items-center bg-[var(--color-fondo)]"
+        style={{ minHeight: '100dvh', padding: '32px 16px' }}
+      >
+        <div className="w-full" style={{ maxWidth: 480 }}>
+          {onCambioClave ? (
+            <Outlet />
+          ) : (
+            <div className="flex items-center justify-center" style={{ minHeight: '50dvh' }}>
+              <LoadingSpinner />
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-row" style={{ minHeight: '100dvh' }}>

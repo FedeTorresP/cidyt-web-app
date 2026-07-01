@@ -193,10 +193,21 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
-    // Perfiles de app — lectura propia; alta/edición solo admin
+    // Perfiles de app — lectura propia; alta/edición solo admin.
+    // Read: el usuario solo lee su propio doc; admin/super admin leen todos.
+    // Excepción acotada de update: el propio usuario puede limpiar su flag de
+    // cambio de contraseña obligatorio (solo mustChangePassword=false + updatedAt).
     match /usuarios/{docId} {
-      allow read: if isAuth();
-      allow create, update, delete: if isSuperAdmin();
+      allow read: if request.auth.uid == docId || isAdmin();
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin()
+        || (
+          request.auth.uid == docId
+          && request.resource.data.diff(resource.data)
+               .affectedKeys().hasOnly(['mustChangePassword', 'updatedAt'])
+          && request.resource.data.mustChangePassword == false
+          && request.resource.data.updatedAt is timestamp
+        );
     }
 
     match /audit_log/{docId} {

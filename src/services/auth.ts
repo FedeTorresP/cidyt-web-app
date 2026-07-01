@@ -46,8 +46,8 @@ export async function changePassword(newPassword: string): Promise<void> {
 
 /**
  * Extrae AuthUser con custom claims del usuario de Firebase.
- * Si no hay custom claims (usuario recién creado sin configurar),
- * se asume acceso completo para desarrollo.
+ * Sin claims (roleId ausente) => sin privilegios: no super admin, no admin.
+ * El acceso se otorga exclusivamente vía custom claims asignados server-side.
  */
 export async function extractAuthUser(user: User): Promise<AuthUser> {
   const tokenResult = await user.getIdTokenResult()
@@ -55,16 +55,6 @@ export async function extractAuthUser(user: User): Promise<AuthUser> {
   const roleId = (claims.roleId as string) ?? ''
   const permissions = (claims.permissions as string[]) ?? []
   const isSuperAdmin = permissions.includes('*')
-
-  // Si no tiene roleId asignado, asumir admin con acceso total (dev mode)
-  if (!roleId) {
-    return {
-      uid: user.uid,
-      email: user.email,
-      roleId: 'admin',
-      isSuperAdmin: true,
-    }
-  }
 
   return {
     uid: user.uid,

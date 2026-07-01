@@ -3,6 +3,31 @@
 Todos los cambios notables en este proyecto se documentan en este archivo.
 El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versionado **[Semántico](https://semver.org/)**.
 
+## [3.10.0] — 2026-07-01
+
+### Seguridad — sistema de usuarios/roles (RBAC), cambio de contraseña obligatorio y lectura acotada de `usuarios`
+
+Provisiona el modelo de usuarios y roles sobre custom claims, obliga el cambio de contraseña en el primer acceso y elimina dos exposiciones: el fallback que otorgaba super admin sin claims y la lectura de PII de todos los usuarios por cualquier autenticado.
+
+#### Agregado
+- **Perfiles y RBAC por permisos** sembrados desde `scripts/seed-catalogos.mjs`: colección `perfiles` (ADMIN, CIDYT, CAJA, MEDICO) y `permisos` / `rol_permisos` / `menu_items` inline; el menú se filtra por permisos del rol (`getRolePermissionIds` + `filterMenuByPermissions`). ADMIN usa `permissions:['*']`
+- **Gate de cambio de contraseña obligatorio** en `AppShell`: lee `usuarios/{uid}.mustChangePassword` y, si es `true`, bloquea toda la app (layout mínimo, no evadible por URL) forzando `/cambio-clave`
+- **`scripts/provision-usuarios.mjs`** (Admin SDK, idempotente, `--dry-run`): crea/actualiza usuarios en Auth, asigna custom claims por perfil (`roleId`, `nivel`, `permissions`) y upsert de `usuarios/{uid}` con `mustChangePassword:true`; contraseña inicial vía `CIDYT_INIT_PASSWORD` (nunca versionada), sin correos de reseteo
+- **`fetchUsuarioById` / `useCurrentUsuario`** y helpers `getMustChangePassword` / `clearMustChangePassword` en el servicio de usuarios
+
+#### Corregido / Seguridad
+- **Fallback inseguro eliminado** en `extractAuthUser`: un usuario sin `roleId` ya no se trata como super admin; los privilegios provienen exclusivamente de custom claims server-side
+- **Lectura de `usuarios` acotada** en `firestore.rules`: `read` solo del doc propio (`request.auth.uid == docId`) o admin, en vez de cualquier autenticado — corta la exposición de PII (correo, nombre, no. empleado) entre usuarios
+- **Update self acotado** en `usuarios`: el propio usuario solo puede modificar `mustChangePassword` (a `false`) y `updatedAt` (`hasOnly` + ownership + tipos), el resto sigue siendo solo admin
+- **`Mi Perfil`** ahora lee su propio documento por UID (self-read) en lugar de listar toda la colección, compatible con la nueva regla
+- **Validación de contraseña fuerte** en `/cambio-clave` (mínimo 8 caracteres con mayúscula, minúscula y dígito)
+
+#### Pendiente
+- Desplegar reglas (`firebase deploy --only firestore:rules`) y correr el sembrado + provisión con credenciales
+- Comunicar la contraseña inicial fuera de banda; `cidyt@medicasur.org.mx` es buzón compartido con `permissions:['*']` (aceptado por el owner)
+
+---
+
 ## [3.9.2] — 2026-07-01
 
 ### Herramientas — auditoría de paquete_detalle y limpieza de datos legacy

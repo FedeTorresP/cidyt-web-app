@@ -2,6 +2,7 @@ import {
   collection,
   query,
   getDocs,
+  getDoc,
   doc,
   updateDoc,
   addDoc,
@@ -27,6 +28,8 @@ export interface UsuarioFirestore {
   nombre?: string
   apellidoPaterno?: string
   apellidoMaterno?: string
+  /** Fuerza el cambio de contraseña obligatorio en el primer acceso. */
+  mustChangePassword?: boolean
   createdAt: Timestamp
   updatedAt: Timestamp
 }
@@ -63,6 +66,18 @@ export async function fetchUsuarios(): Promise<UsuarioFirestore[]> {
     id: d.id,
     ...(d.data() as Omit<UsuarioFirestore, 'id'>),
   }))
+}
+
+/**
+ * Obtiene un único usuario por su ID de documento (= UID de Firebase Auth).
+ * Lectura acotada: la regla de Firestore solo permite leer el doc propio
+ * (o cualquiera si es admin). Retorna null si no existe.
+ */
+export async function fetchUsuarioById(uid: string): Promise<UsuarioFirestore | null> {
+  const db = getFirebaseFirestore()
+  const snap = await getDoc(doc(db, 'usuarios', uid))
+  if (!snap.exists()) return null
+  return { id: snap.id, ...(snap.data() as Omit<UsuarioFirestore, 'id'>) }
 }
 
 /**
@@ -160,4 +175,29 @@ export async function deactivateUsuario(userId: string): Promise<void> {
  */
 export async function sendPasswordResetLink(email: string): Promise<void> {
   await sendPasswordResetEmail(getFirebaseAuth(), email)
+}
+
+/**
+ * Indica si el usuario debe cambiar su contraseña obligatoriamente.
+ * Doc ausente o campo indefinido => false (no bloquea).
+ * El doc `usuarios/{uid}` debe tener id = UID de Firebase Auth.
+ */
+export async function getMustChangePassword(uid: string): Promise<boolean> {
+  const db = getFirebaseFirestore()
+  const snap = await getDoc(doc(db, 'usuarios', uid))
+  if (!snap.exists()) return false
+  return snap.data().mustChangePassword === true
+}
+
+/**
+ * Limpia el flag de cambio de contraseña obligatorio tras un cambio exitoso.
+ * Solo modifica `mustChangePassword` y `updatedAt` (compatible con la regla acotada
+ * de self-update en firestore.rules).
+ */
+export async function clearMustChangePassword(uid: string): Promise<void> {
+  const db = getFirebaseFirestore()
+  await updateDoc(doc(db, 'usuarios', uid), {
+    mustChangePassword: false,
+    updatedAt: Timestamp.now(),
+  })
 }

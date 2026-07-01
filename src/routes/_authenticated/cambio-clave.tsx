@@ -1,6 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { changePassword } from '@/services/auth'
+import { clearMustChangePassword } from '@/services/users'
+import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -11,7 +14,22 @@ export const Route = createFileRoute('/_authenticated/cambio-clave')({
   component: CambioClavePage,
 })
 
+/**
+ * Valida que la contraseña sea suficientemente fuerte.
+ * Mínimo 8 caracteres con al menos una minúscula, una mayúscula y un dígito.
+ */
+function validatePasswordStrength(password: string): string | null {
+  if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres.'
+  if (!/[a-z]/.test(password)) return 'Incluya al menos una letra minúscula.'
+  if (!/[A-Z]/.test(password)) return 'Incluya al menos una letra mayúscula.'
+  if (!/[0-9]/.test(password)) return 'Incluya al menos un número.'
+  return null
+}
+
 function CambioClavePage() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -26,8 +44,9 @@ function CambioClavePage() {
     const newPassword = (formData.get('newPassword') as string) || ''
     const confirmPassword = (formData.get('confirmPassword') as string) || ''
 
-    if (newPassword.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.')
+    const strengthError = validatePasswordStrength(newPassword)
+    if (strengthError) {
+      setError(strengthError)
       setLoading(false)
       return
     }
@@ -40,8 +59,13 @@ function CambioClavePage() {
 
     try {
       await changePassword(newPassword)
+      if (user?.uid) {
+        await clearMustChangePassword(user.uid)
+        await queryClient.invalidateQueries({ queryKey: ['must-change-pw', user.uid] })
+      }
       setSuccess(true)
       ;(e.target as HTMLFormElement).reset()
+      navigate({ to: '/', replace: true })
     } catch {
       setError('Error al cambiar la contraseña. Intente cerrar sesión y volver a iniciar.')
     } finally {
