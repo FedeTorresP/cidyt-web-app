@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     col_pacientes: str = "pacientes"
     col_seguimientos: str = "seguimientos"
     col_val_corporal: str = "val_corporal"
+    col_estudios_paciente: str = "estudios_paciente"
+    col_paquete_detalle: str = "paquete_detalle"
+    # Deprecada: el pipeline ya no escribe estudios_realizar (se usa
+    # estudios_paciente, el esquema canónico que consume la app).
     col_estudios_realizar: str = "estudios_realizar"
     col_empresas: str = "empresas"
     col_paquetes: str = "paquetes"
@@ -44,6 +48,7 @@ class Settings(BaseSettings):
     default_horario_id: int = 1
     default_medico_id: int = 0
     default_user_crea: str = "SAP"
+    default_estatus_seguimiento: str = "EN_PROCESO"
     paquete_det_estudios: int = 20
 
     # --- General ------------------------------------------------------------

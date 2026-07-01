@@ -31,6 +31,31 @@ def timestamp_iso() -> str:
     return now_mx().isoformat()
 
 
+def inicio_dia_mx() -> datetime:
+    """Hoy a las 00:00:00 en la zona horaria del negocio (tz-aware).
+
+    Firestore lo almacena como Timestamp. Equivale a `dayRangeMX(hoy).start`
+    del frontend y se usa para `fechaIngresoUtc`.
+    """
+    return now_mx().replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def fecha_a_datetime(value: str | None) -> datetime | None:
+    """Convierte una fecha 'YYYY-MM-DD' a datetime tz-aware (medianoche MX).
+
+    Firestore lo almacena como Timestamp. Se usa para `fechaNacimiento`.
+    Devuelve None si el valor está vacío o no se puede parsear.
+    """
+    iso = normalize_fecha(value)
+    if not iso:
+        return None
+    try:
+        y, m, d = (int(p) for p in iso.split("-"))
+        return datetime(y, m, d, tzinfo=ZoneInfo(get_settings().timezone))
+    except (ValueError, TypeError):
+        return None
+
+
 def normalize_fecha(value: str | None) -> str | None:
     """Normaliza una fecha de SAP a 'YYYY-MM-DD'.
 

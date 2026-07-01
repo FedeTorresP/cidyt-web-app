@@ -7,16 +7,21 @@ La operación se deriva de `message.event` de SAP:
   - DELETE (Deletepatient): baja lógica (activo=False) de la cita y sus
     documentos relacionados.
 
+El esquema escrito es el canónico camelCase que consume la app (idéntico al
+alta manual `crearPacienteFirestore`): SAP es la fuente de verdad de la
+identidad/cita/paquete/empresa, pero NO sobrescribe los campos operativos que
+captura el personal en la app (turno, peso/talla, estatus de estudios, etc.).
+
 Flujo de alta por paciente:
   1. Dedup por No_Cita (doc id en la colección interface).
   2. Asegurar empresa (alias) y paquete; crearlos si no existen.
-  3. Leer catálogo de estudios con mostrar_interface=true y activo=true.
+  3. Leer estudios incluidos del paquete desde `paquete_detalle`.
   4. Escribir en una sola operación batch:
+       - paciente (camelCase: apePaterno, fechaNacimiento Timestamp, sexo...)
+       - seguimiento (camelCase: pacienteId, fechaIngresoUtc Timestamp...)
+       - val_corporal (seguimientoId, peso/talla 0.0)
+       - estudios_paciente (uno por estudio de paquete_detalle)
        - interface_ipad (trazabilidad + dedup, Estatus_Evaluado=1)
-       - paciente
-       - seguimiento (valoracion_pac)
-       - val_corporal (peso/talla 0.0)
-       - estudios_realizar (uno por estudio del catálogo)
 """
 
 from __future__ import annotations
@@ -26,7 +31,12 @@ import logging
 from google.cloud import firestore
 
 from app.config import Settings, get_settings
-from app.core.datetime_mx import fecha_hoy, hora_ahora, timestamp_iso
+from app.core.datetime_mx import (
+    fecha_a_datetime,
+    fecha_hoy,
+    inicio_dia_mx,
+    timestamp_iso,
+)
 from app.core.normalizer import normalize_deep
 from app.firebase import get_db
 from app.models.patient import (
@@ -95,15 +105,17 @@ def _ensure_paquete(db: firestore.Client, s: Settings, paq_id: str, nombre: str)
         logger.info("Paquete creado: %s — %s", paq_id, nombre)
 
 
-def _catalogo_estudios(db: firestore.Client, s: Settings) -> list[dict]:
-    """Estudios con mostrar_interface=true y activo=true.
+def _estudios_de_paquete(db: firestore.Client, s: Settings, paq_id: str) -> list[dict]:
+    """Estudios incluidos en un paquete, leídos de `paquete_detalle` (activo).
 
-    Equivale a: SELECT nombre, estudio_id FROM estudio
-    WHERE Mostrar_Interface = 1 AND activo = 1.
+    Misma fuente que el alta manual del frontend: paquete_detalle filtrado por
+    paqueteId y activo. Devuelve [{estudio_id, estatus_inicial}].
     """
-    col = db.collection(s.col_estudios)
+    if not paq_id:
+        return []
+    col = db.collection(s.col_paquete_detalle)
     docs = (
-        col.where("mostrar_interface", "==", True)
+        col.where("paqueteId", "==", paq_id)
         .where("activo", "==", True)
         .stream()
     )
@@ -112,14 +124,15 @@ def _catalogo_estudios(db: firestore.Client, s: Settings) -> list[dict]:
         data = d.to_dict() or {}
         estudios.append(
             {
-                "estudio_id": data.get("estudio_id", d.id),
-                "nombre": data.get("nombre", ""),
+                "estudio_id": data.get("estudioId"),
+                "estatus_inicial": data.get("estatusInicial", 0),
             }
         )
     if not estudios:
         logger.warning(
-            "Catálogo de estudios vacío (col '%s'): no se crearán estudios_realizar",
-            s.col_estudios,
+            "Paquete sin estudios en '%s' (paqueteId=%s): grid de estudios vacío",
+            s.col_paquete_detalle,
+            paq_id,
         )
     return estudios
 
@@ -140,90 +153,100 @@ def _insertar_paciente(db: firestore.Client, s: Settings, pat: SapPatient) -> Pa
         empresa_id = _resolve_empresa_opcional(db, s, pat)
         _ensure_paquete(db, s, pat.paq_id, pat.desc_paq)
 
-        # 3. Catálogo de estudios.
-        estudios = _catalogo_estudios(db, s)
+        # 3. Estudios incluidos en el paquete (paquete_detalle).
+        estudios = _estudios_de_paquete(db, s, pat.paq_id)
 
         # 4. Escritura atómica en batch.
         hoy = fecha_hoy()
-        ahora = hora_ahora()
+        # El día en que aparece el paciente lo define la fecha de cita de SAP;
+        # si no viene, se usa hoy como respaldo.
+        fecha_ing = pat.fecha_cita or hoy
+        fecha_ing_utc = fecha_a_datetime(pat.fecha_cita) or inicio_dia_mx()
         user = s.default_user_crea
+        # La app solo entiende sexo 'M'/'F'; cualquier otro valor se descarta.
+        genero_norm = (pat.genero or "").upper()
+        sexo = genero_norm if genero_norm in {"M", "F"} else None
+        ahora_ts = firestore.SERVER_TIMESTAMP
 
         batch = db.batch()
 
-        # 4a. paciente (NFC para consistencia macOS/Linux)
+        # 4a. paciente — esquema canónico camelCase (campos de SAP)
         paciente_ref = db.collection(s.col_pacientes).document()
         batch.set(
             paciente_ref,
             normalize_deep({
                 "nombre1": pat.nombre1,
                 "nombre2": pat.nombre2,
-                "apellido_paterno": pat.ape_pat,
-                "apellido_materno": pat.ape_mat,
-                "nombre_completo": pat.nombre_completo,
-                "genero": pat.genero,
+                "apePaterno": pat.ape_pat,
+                "apeMaterno": pat.ape_mat,
+                "sexo": sexo,
+                "fechaNacimiento": fecha_a_datetime(pat.fecha_nac),
                 "historia": pat.num_hist,
-                "fecha_nac": pat.fecha_nac,
                 "activo": True,
-                "user_crea": user,
-                "fecha_crea": hoy,
+                "createdBy": user,
+                "updatedBy": user,
+                "createdAt": ahora_ts,
+                "updatedAt": ahora_ts,
             }),
         )
 
-        # 4b. seguimiento (valoracion_pac)
+        # 4b. seguimiento — SAP siembra identidad/cita/paquete + defaults
+        # operativos (que luego edita el personal en la app).
         seguimiento_ref = db.collection(s.col_seguimientos).document()
         batch.set(
             seguimiento_ref,
             {
-                "entidad_id": s.default_entidad_id,
-                "paciente_id": paciente_ref.id,
-                "paquete_id": pat.paq_id,
-                "empresa_id": empresa_id,
-                "medico_id": s.default_medico_id,
-                "no_cita": pat.no_cita,
-                "fecha_ingreso": hoy,
-                "hora_ingreso": ahora,
+                "pacienteId": paciente_ref.id,
+                "empresaId": empresa_id or None,
+                "paqueteId": pat.paq_id,
+                "noCita": pat.no_cita,
                 "turno": s.default_turno,
-                "horario_id": s.default_horario_id,
+                "fechaIngreso": fecha_ing,
+                "fechaIngresoUtc": fecha_ing_utc,
+                "estatusSeguimiento": s.default_estatus_seguimiento,
                 "desayuno": 0,
-                "estatus_valpac_id": 0,
+                "estatusValpac": 0,
+                "padecimientoId": 0,
+                "medicoInternistaId": None,
+                "fechaEntrega": None,
+                "horaEntrega": None,
+                "fechaEnvio": None,
+                "horaEnvio": None,
+                "tarjetaEntRes": 0,
+                "observaciones": "",
                 "activo": True,
-                "user_crea": user,
-                "fecha_crea": hoy,
+                "createdBy": user,
+                "updatedBy": user,
+                "createdAt": ahora_ts,
+                "updatedAt": ahora_ts,
             },
         )
 
-        # 4c. val_corporal
+        # 4c. val_corporal — peso/talla 0 (los captura el personal)
         val_corporal_ref = db.collection(s.col_val_corporal).document()
         batch.set(
             val_corporal_ref,
             {
-                "seguimiento_id": seguimiento_ref.id,
-                "entidad_id": s.default_entidad_id,
-                "paciente_id": paciente_ref.id,
+                "seguimientoId": seguimiento_ref.id,
                 "peso": 0.0,
                 "talla": 0.0,
                 "activo": True,
-                "user_crea": user,
-                "fecha_crea": hoy,
             },
         )
 
-        # 4d. estudios_realizar (uno por estudio del catálogo)
+        # 4d. estudios_paciente (uno por estudio de paquete_detalle)
         for est in estudios:
-            er_ref = db.collection(s.col_estudios_realizar).document()
+            ep_ref = db.collection(s.col_estudios_paciente).document()
             batch.set(
-                er_ref,
+                ep_ref,
                 {
-                    "seguimiento_id": seguimiento_ref.id,
-                    "entidad_id": s.default_entidad_id,
-                    "paciente_id": paciente_ref.id,
-                    "estudio_id": est["estudio_id"],
-                    "nombre": est["nombre"],
-                    "estudio_tipo_id": 1,
-                    "estatus_est_id": 0,
+                    "seguimientoId": seguimiento_ref.id,
+                    "estudioId": str(est["estudio_id"]),
+                    "estatusEstudioId": str(est["estatus_inicial"]),
+                    "medicoId": None,
+                    "letraMedico": None,
+                    "observaciones": "",
                     "activo": True,
-                    "user_crea": user,
-                    "fecha_crea": hoy,
                 },
             )
 
@@ -293,12 +316,20 @@ def _actualizar_paciente(db: firestore.Client, s: Settings, pat: SapPatient) -> 
 
         data = snap.to_dict() or {}
         paciente_id = data.get("paciente_id")
+        seguimiento_id = data.get("seguimiento_id")
         user = s.default_user_crea
         ahora = timestamp_iso()
+        ahora_ts = firestore.SERVER_TIMESTAMP
+        genero_norm = (pat.genero or "").upper()
+        sexo = genero_norm if genero_norm in {"M", "F"} else None
+
+        # SAP puede cambiar empresa/paquete: se reaseguran.
+        empresa_id = _resolve_empresa_opcional(db, s, pat)
+        _ensure_paquete(db, s, pat.paq_id, pat.desc_paq)
 
         batch = db.batch()
 
-        # Actualiza datos del paciente vinculado (si lo hay).
+        # Actualiza datos del paciente vinculado (solo campos de SAP; camelCase).
         if paciente_id:
             paciente_ref = db.collection(s.col_pacientes).document(paciente_id)
             batch.set(
@@ -306,17 +337,34 @@ def _actualizar_paciente(db: firestore.Client, s: Settings, pat: SapPatient) -> 
                 normalize_deep({
                     "nombre1": pat.nombre1,
                     "nombre2": pat.nombre2,
-                    "apellido_paterno": pat.ape_pat,
-                    "apellido_materno": pat.ape_mat,
-                    "nombre_completo": pat.nombre_completo,
-                    "genero": pat.genero,
+                    "apePaterno": pat.ape_pat,
+                    "apeMaterno": pat.ape_mat,
+                    "sexo": sexo,
+                    "fechaNacimiento": fecha_a_datetime(pat.fecha_nac),
                     "historia": pat.num_hist,
-                    "fecha_nac": pat.fecha_nac,
-                    "user_mod": user,
-                    "fecha_mod": ahora,
+                    "updatedBy": user,
+                    "updatedAt": ahora_ts,
                 }),
                 merge=True,
             )
+
+        # Sincroniza SOLO los campos de SAP en el seguimiento (paquete/empresa);
+        # nunca toca campos operativos capturados en la app ni re-siembra estudios.
+        if seguimiento_id:
+            seguimiento_ref = db.collection(s.col_seguimientos).document(seguimiento_id)
+            seg_update = {
+                "paqueteId": pat.paq_id,
+                "empresaId": empresa_id or None,
+                "updatedBy": user,
+                "updatedAt": ahora_ts,
+            }
+            # La fecha de cita es campo de SAP: si viene, se sincroniza el día
+            # en que el paciente aparece en la lista (sin tocar campos operativos).
+            fecha_ing_utc = fecha_a_datetime(pat.fecha_cita)
+            if fecha_ing_utc is not None:
+                seg_update["fechaIngreso"] = pat.fecha_cita
+                seg_update["fechaIngresoUtc"] = fecha_ing_utc
+            batch.set(seguimiento_ref, seg_update, merge=True)
 
         # Actualiza la trazabilidad en interface.
         batch.set(
