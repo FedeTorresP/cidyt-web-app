@@ -16,6 +16,13 @@ export const Route = createLazyFileRoute('/_authenticated/paciente')({
   component: RegistroPacientesPage,
 })
 
+/**
+ * Alta manual de pacientes. Se habilitó para la versión alpha (sin sap-pipeline).
+ * Con sap-pipeline en producción los pacientes provienen de SAP, por lo que el
+ * botón "+ Nuevo Paciente" queda oculto. Poner `true` para reactivarlo.
+ */
+const ALTA_MANUAL_HABILITADA = false
+
 /* ═══════════════════════════════════════════════════════════════════════════
    FORM VACÍO
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -321,26 +328,32 @@ function RegistroPacientesPage() {
           <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h2 style={{ color: '#ffffff', fontSize: '1rem', fontWeight: 600, margin: 0 }}>Lista de Pacientes</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                onClick={handleNuevo}
-                style={{
-                  minHeight: '36px',
-                  padding: '0 14px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  backgroundColor: 'var(--color-acento)',
-                  color: '#ffffff',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-                title="Registrar nuevo paciente"
-              >
-                + Nuevo Paciente
-              </button>
+              {/* Alta manual de pacientes deshabilitada: los pacientes ahora
+                  provienen de sap-pipeline. El formulario (`handleNuevo`) se
+                  conserva intacto para edición y por si se reactiva
+                  (poner ALTA_MANUAL_HABILITADA = true). */}
+              {ALTA_MANUAL_HABILITADA && (
+                <button
+                  onClick={handleNuevo}
+                  style={{
+                    minHeight: '36px',
+                    padding: '0 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: 'var(--color-acento)',
+                    color: '#ffffff',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                  title="Registrar nuevo paciente"
+                >
+                  + Nuevo Paciente
+                </button>
+              )}
               <input
                 type="date"
                 value={fecha}
