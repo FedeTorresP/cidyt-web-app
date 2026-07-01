@@ -3,6 +3,24 @@
 Todos los cambios notables en este proyecto se documentan en este archivo.
 El formato sigue **[Keep a Changelog](https://keepachangelog.com/)** y el versionado **[Semántico](https://semver.org/)**.
 
+## [3.10.1] — 2026-07-01
+
+### Corregido — estudios fuera del paquete se marcan como "No Incluido" en Lista del Día
+
+En Lista de Pacientes (Lista del Día) las 20 columnas de estudio arrancaban en "Sin Estatus" (transparente), por lo que los estudios que no forman parte del paquete del paciente se veían idénticos a los incluidos (celdas vacías). Se alinea la vista con Caja y con la leyenda de colores.
+
+#### Corregido
+- **Prellenado "No Incluido"**: `buildPacienteListaDia` inicializa las 20 columnas en `No Incluido` (estatus 1); los estudios del paquete se sobreponen con su estatus real desde `estudios_paciente`. Los estudios fuera del paquete quedan marcados
+- **Color "No Incluido" en Lista del Día**: estatus 1 se pinta gris oscuro sólido (`#374151`) en vez de borde transparente, consistente con la vista Caja y la leyenda
+- **"No Incluido" también en Caja**: `buildPacienteCaja` inicializa las 20 columnas en estatus 1 (antes 0), de modo que los estudios fuera del paquete se ven gris oscuro `#374151` igual que en Lista del Día (antes salían gris claro indistinguibles)
+- **Correlación Lista del Día → Caja**: al cambiar el estatus de un estudio en Lista de Pacientes, la mutación invalida el cache de Lista de Pacientes Caja (`useUpdateEstudioPaciente`), de modo que Caja refleja el nuevo estatus al mostrarse (la fuente de verdad es `estudios_paciente`)
+
+#### Notas
+- No es un problema del paquete ni del sembrado: `paquete_detalle` de `DT0007` tiene sus 14 estudios y los pacientes ya los tienen sembrados; el gap era de presentación
+- Los estudios incluidos con `estatusInicial = 0` siguen mostrándose como celda accionable (vacía) hasta que el personal les asigne estatus
+
+---
+
 ## [3.10.0] — 2026-07-01
 
 ### Seguridad — sistema de usuarios/roles (RBAC), cambio de contraseña obligatorio y lectura acotada de `usuarios`

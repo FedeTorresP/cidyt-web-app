@@ -17,6 +17,7 @@ import {
   type EstudioPacienteRow,
   type SeguimientoDelDia,
 } from '@/lib/pacientes-firestore'
+import { LISTA_CAJA_QUERY_KEY } from './use-lista-caja'
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TIPOS
@@ -99,9 +100,10 @@ function buildPacienteListaDia(
   s: SeguimientoDelDia,
   eps: EstudioPacienteRow[],
 ): PacienteListaDia {
-  // Base: las 20 columnas fijas inicializadas en "Sin Estatus".
+  // Base: las 20 columnas fijas inicializadas en "No Incluido" (fuera del paquete).
+  // Los estudios del paquete se sobreponen abajo con su estatus real (estudios_paciente).
   const estudios: Record<number, EstudioCellState> = {}
-  for (const id of ESTUDIO_COL_IDS) estudios[id] = { estatusId: 0 }
+  for (const id of ESTUDIO_COL_IDS) estudios[id] = { estatusId: 1 }
 
   const adicionales: EstudioAdicionalListaDia[] = []
   for (const ep of eps) {
@@ -296,25 +298,30 @@ export function useUpdateEstudioPaciente(fecha: string) {
       }
     },
     onSuccess: (docId, input) => {
-      if (!docId) return
-      qc.setQueryData<PacienteListaDia[]>(
-        [...LISTA_DIA_QUERY_KEY, fecha],
-        (old) => {
-          if (!old) return old
-          return old.map((p) => {
-            if (p.seguimientoId !== input.seguimientoId) return p
-            const cell = p.estudios[input.estudioId]
-            if (!cell) return p
-            return {
-              ...p,
-              estudios: {
-                ...p.estudios,
-                [input.estudioId]: { ...cell, estudiosPacienteId: docId },
-              },
-            }
-          })
-        },
-      )
+      if (docId) {
+        qc.setQueryData<PacienteListaDia[]>(
+          [...LISTA_DIA_QUERY_KEY, fecha],
+          (old) => {
+            if (!old) return old
+            return old.map((p) => {
+              if (p.seguimientoId !== input.seguimientoId) return p
+              const cell = p.estudios[input.estudioId]
+              if (!cell) return p
+              return {
+                ...p,
+                estudios: {
+                  ...p.estudios,
+                  [input.estudioId]: { ...cell, estudiosPacienteId: docId },
+                },
+              }
+            })
+          },
+        )
+      }
+      // Correlación con Lista de Pacientes Caja: la fuente de verdad es
+      // `estudios_paciente` (ya persistido). Invalidamos el cache de Caja para
+      // que refleje el nuevo estatus al mostrarse.
+      qc.invalidateQueries({ queryKey: LISTA_CAJA_QUERY_KEY })
     },
   })
 }

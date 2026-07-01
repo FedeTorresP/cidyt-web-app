@@ -55,7 +55,7 @@ const ESTUDIOS_COLUMNAS = [
 /** Estatus de estudio — colores y letra para cuadro sólido. */
 const ESTATUS_ESTUDIO = [
   { id: 0, nombre: 'Sin Estatus', color: 'transparent', letra: '', esBorde: true },
-  { id: 1, nombre: 'No Incluido', color: 'transparent', letra: '', esBorde: true },
+  { id: 1, nombre: 'No Incluido', color: '#374151', letra: '', esBorde: false },
   { id: 2, nombre: 'En Espera', color: '#1976D2', letra: 'E', esBorde: false },
   { id: 3, nombre: 'En Proceso', color: '#facc15', letra: '', esBorde: false },
   { id: 4, nombre: 'Completo', color: '#00A651', letra: 'C', esBorde: false },

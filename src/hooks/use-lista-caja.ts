@@ -40,8 +40,11 @@ export const LISTA_CAJA_QUERY_KEY = ['lista-caja-pacientes']
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function buildPacienteCaja(s: SeguimientoDelDia, eps: EstudioPacienteRow[]): PacienteCaja {
+  // Base: las 20 columnas fijas inicializadas en "No Incluido" (fuera del paquete),
+  // igual que Lista del Día. Los estudios del paquete se sobreponen abajo con su
+  // estatus real (estudios_paciente).
   const estudios: Record<number, EstudioCajaCell> = {}
-  for (const id of ESTUDIO_COL_IDS) estudios[id] = { estatusId: 0, letraMedico: null }
+  for (const id of ESTUDIO_COL_IDS) estudios[id] = { estatusId: 1, letraMedico: null }
 
   for (const ep of eps) {
     if (ep.estudioId === ESTUDIO_ADICIONAL_ID) continue
